@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import report, severity
+from . import baseline, diff, report, severity
 from .scanner import DEFAULT_ENTROPY_THRESHOLD, scan_paths
 
 
@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--format",
-        choices=["table", "json"],
+        choices=["table", "json", "sarif"],
         default="table",
         help="Output format (default: table).",
     )
@@ -49,6 +49,29 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable colored table output.",
     )
+    parser.add_argument(
+        "--diff-only",
+        action="store_true",
+        help="Scan only files changed vs --base-ref (via git diff) instead of --paths.",
+    )
+    parser.add_argument(
+        "--base-ref",
+        default="origin/main",
+        help="Git ref to diff against when --diff-only is set (default: origin/main).",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=None,
+        help="Baseline file of known-finding fingerprints; matching findings are "
+        "excluded from output and from --fail-on, so only new findings fail the build.",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        type=Path,
+        default=None,
+        help="Write the current findings to a baseline file (as fingerprints) and exit.",
+    )
     return parser
 
 
@@ -56,14 +79,38 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    findings = scan_paths(
-        [Path(p) for p in args.paths],
-        enable_entropy=not args.no_entropy,
-        entropy_threshold=args.entropy_threshold,
-    )
+    if args.diff_only:
+        changed = diff.changed_files(args.base_ref, Path.cwd())
+        findings = (
+            scan_paths(
+                changed,
+                enable_entropy=not args.no_entropy,
+                entropy_threshold=args.entropy_threshold,
+                ignore_root=Path.cwd(),
+            )
+            if changed
+            else []
+        )
+    else:
+        findings = scan_paths(
+            [Path(p) for p in args.paths],
+            enable_entropy=not args.no_entropy,
+            entropy_threshold=args.entropy_threshold,
+        )
+
+    if args.write_baseline:
+        baseline.write_baseline(args.write_baseline, findings)
+        print(f"Wrote {len({f.fingerprint for f in findings})} fingerprint(s) to {args.write_baseline}")
+        return 0
+
+    if args.baseline:
+        known = baseline.load_baseline(args.baseline)
+        findings = baseline.filter_known(findings, known)
 
     if args.format == "json":
         print(report.to_json(findings))
+    elif args.format == "sarif":
+        print(report.to_sarif(findings))
     else:
         color = not args.no_color and sys.stdout.isatty()
         print(report.to_table(findings, color=color))

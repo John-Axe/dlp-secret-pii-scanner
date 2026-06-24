@@ -75,7 +75,7 @@ def precision_recall_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]
     return precision, recall, f1
 
 
-def render_table(results: dict) -> str:
+def render_table(results: dict) -> tuple[str, float, float, float]:
     per_rule = results["per_rule"]
     headers = ["RULE", "TP", "FP", "FN", "PRECISION", "RECALL", "F1"]
     rows = []
@@ -120,6 +120,30 @@ def render_table(results: dict) -> str:
     return "\n".join(lines), overall_p, overall_r, overall_f1
 
 
+def badge_color(precision: float) -> str:
+    if precision >= 0.9:
+        return "brightgreen"
+    if precision >= 0.75:
+        return "yellow"
+    return "red"
+
+
+def write_badge(path: Path, precision: float, recall: float, f1: float) -> None:
+    """Writes a shields.io endpoint-badge JSON
+    (https://shields.io/badges/endpoint-badge) so the README badge always
+    reflects the most recent benchmark run instead of a hand-typed number.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "schemaVersion": 1,
+        "label": "dlp-scan benchmark",
+        "message": f"precision {precision:.0%} · recall {recall:.0%} · f1 {f1:.0%}",
+        "color": badge_color(precision),
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the DLP scanner benchmark.")
     parser.add_argument(
@@ -134,12 +158,23 @@ def main(argv: list[str] | None = None) -> int:
         default=0.85,
         help="Fail (exit 1) if overall recall drops below this (default: 0.85).",
     )
+    parser.add_argument(
+        "--badge-output",
+        type=Path,
+        default=None,
+        help="Write a shields.io endpoint-badge JSON with the current precision/recall/f1 "
+        "to this path (e.g. .github/badges/benchmark.json).",
+    )
     args = parser.parse_args(argv)
 
     results = evaluate()
     table, precision, recall, f1 = render_table(results)
     print(table)
     print(f"\nOverall precision={precision:.2%} recall={recall:.2%} f1={f1:.2%}")
+
+    if args.badge_output:
+        write_badge(args.badge_output, precision, recall, f1)
+        print(f"\nWrote badge data to {args.badge_output}")
 
     if precision < args.min_precision:
         print(

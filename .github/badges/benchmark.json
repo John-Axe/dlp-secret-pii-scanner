@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "label": "dlp-scan benchmark",
+  "message": "precision 94% \u00b7 recall 100% \u00b7 f1 97%",
+  "color": "brightgreen"
+}

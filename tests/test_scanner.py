@@ -78,6 +78,34 @@ def test_binary_file_is_skipped(tmp_path: Path):
     assert findings == []
 
 
+def test_scan_paths_applies_dlpignore_to_individual_files_with_shared_ignore_root(tmp_path: Path):
+    (tmp_path / ".dlpignore").write_text("tests/*\n")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    ignored_file = tests_dir / "fixture.py"
+    ignored_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    kept_file = tmp_path / "app.py"
+    kept_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    findings = scan_paths([ignored_file, kept_file], ignore_root=tmp_path)
+
+    files_with_findings = {f.file for f in findings}
+    assert not any("fixture.py" in f for f in files_with_findings)
+    assert any("app.py" in f for f in files_with_findings)
+
+
+def test_scan_paths_without_ignore_root_falls_back_to_per_file_parent(tmp_path: Path):
+    (tmp_path / ".dlpignore").write_text("tests/*\n")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    target = tests_dir / "fixture.py"
+    target.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    findings = scan_paths([target])
+
+    assert any(f.rule_id == "aws_access_key_id" for f in findings)
+
+
 def test_entropy_detector_can_be_disabled(tmp_path: Path):
     target = tmp_path / "secret.txt"
     target.write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")

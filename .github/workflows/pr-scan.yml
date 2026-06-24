@@ -1,0 +1,63 @@
+name: PR scan
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diff-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Fetch base ref
+        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+
+      - name: Diff-only scan (JSON, for inline comments)
+        id: json_scan
+        continue-on-error: true
+        run: |
+          dlp-scan --diff-only --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
+            --baseline .dlp-baseline.json \
+            --format json --fail-on high > findings.json
+
+      - name: Post inline review comments
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m dlp.github_pr findings.json
+
+      - name: Diff-only scan (SARIF, for Security tab)
+        if: always()
+        run: |
+          dlp-scan --diff-only --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
+            --baseline .dlp-baseline.json --format sarif --fail-on none > results.sarif
+
+      - name: Upload SARIF to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: results.sarif
+
+      - name: Fail the check if new findings were detected
+        if: steps.json_scan.outcome == 'failure'
+        run: exit 1

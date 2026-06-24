@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from pathlib import Path
 
 from . import detectors, ignore
@@ -25,13 +26,28 @@ class Finding:
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
 
+    @property
+    def fingerprint(self) -> str:
+        """Stable identity for this finding, used by baseline mode and SARIF
+        partialFingerprints. Deliberately excludes the line number so it
+        survives unrelated edits earlier in the file.
+        """
+        digest = hashlib.sha256(f"{self.file}|{self.rule_id}|{self.redacted}".encode()).hexdigest()
+        return digest[:16]
+
 
 def _is_probably_binary(data: bytes) -> bool:
     return b"\x00" in data[:8192]
 
 
-def _iter_files(root: Path, ignore_patterns: list[str]):
+def _iter_files(root: Path, ignore_patterns: list[str], ignore_base: Path):
     if root.is_file():
+        if root.is_relative_to(ignore_base):
+            rel = root.relative_to(ignore_base).as_posix()
+        else:
+            rel = root.name
+        if ignore.is_path_ignored(rel, ignore_patterns):
+            return
         yield root
         return
     for path in sorted(root.rglob("*")):
@@ -103,12 +119,30 @@ def scan_paths(
     *,
     enable_entropy: bool = True,
     entropy_threshold: float = DEFAULT_ENTROPY_THRESHOLD,
+    ignore_root: Path | None = None,
 ) -> list[Finding]:
+    """Scans files and/or directories.
+
+    `ignore_root` anchors where `.dlpignore` is loaded from and what
+    individual file paths are matched against. It matters for callers like
+    `--diff-only` that pass a list of individual changed files rather than
+    a single directory: without a shared root, each file would only ever
+    look for a `.dlpignore` next to itself, so a repo-root `.dlpignore`
+    would never apply. Defaults to each path's own directory (or parent,
+    for a single file), preserving the original single-root behavior.
+    """
     findings: list[Finding] = []
+    resolved_ignore_root = ignore_root.resolve() if ignore_root is not None else None
+    ignore_cache: dict[Path, list[str]] = {}
+
     for root in paths:
         root = root.resolve()
-        ignore_patterns = ignore.load_dlpignore(root if root.is_dir() else root.parent)
-        for file_path in _iter_files(root, ignore_patterns):
+        ignore_base = resolved_ignore_root or (root if root.is_dir() else root.parent)
+        if ignore_base not in ignore_cache:
+            ignore_cache[ignore_base] = ignore.load_dlpignore(ignore_base)
+        ignore_patterns = ignore_cache[ignore_base]
+
+        for file_path in _iter_files(root, ignore_patterns, ignore_base):
             try:
                 display = str(file_path.relative_to(Path.cwd()))
             except ValueError:

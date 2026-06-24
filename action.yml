@@ -15,7 +15,7 @@ inputs:
     required: false
     default: "high"
   format:
-    description: "Output format: table or json."
+    description: "Output format: table, json, or sarif."
     required: false
     default: "table"
   entropy-threshold:
@@ -27,7 +27,7 @@ runs:
   using: "composite"
   steps:
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
       with:
         python-version: "3.12"
     - name: Install dlp-secret-pii-scanner

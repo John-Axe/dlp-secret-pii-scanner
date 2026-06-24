@@ -170,6 +170,21 @@ def scan_line_entropy(line: str, threshold: float) -> list[Match]:
     return matches
 
 
+def all_rule_metadata() -> list[dict]:
+    """Stable rule_id/name/severity for every detector, including entropy.
+
+    Used to build the SARIF `rules` array so it's complete even on a run
+    with zero findings for a given rule.
+    """
+    metadata = [
+        {"rule_id": d.rule_id, "name": d.name, "severity": d.severity} for d in REGEX_DETECTORS
+    ]
+    metadata.append(
+        {"rule_id": ENTROPY_RULE_ID, "name": "High Entropy String", "severity": ENTROPY_SEVERITY}
+    )
+    return metadata
+
+
 def redact(text: str) -> str:
     """Show a short, non-sensitive preview of a matched secret."""
     if len(text) <= 8:

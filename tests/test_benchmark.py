@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "benchmark"))
 
-from run_benchmark import evaluate, precision_recall_f1  # noqa: E402
+from run_benchmark import badge_color, evaluate, precision_recall_f1, write_badge  # noqa: E402
 
 
 def test_precision_recall_f1_perfect():
@@ -51,3 +51,24 @@ def test_shipped_corpus_clears_documented_gate():
     assert precision >= 0.85
     assert recall >= 0.85
     assert total_tp > 0
+
+
+def test_badge_color_thresholds():
+    assert badge_color(0.95) == "brightgreen"
+    assert badge_color(0.9) == "brightgreen"
+    assert badge_color(0.8) == "yellow"
+    assert badge_color(0.5) == "red"
+
+
+def test_write_badge_produces_shields_io_endpoint_schema(tmp_path):
+    badge_path = tmp_path / "badges" / "benchmark.json"
+
+    write_badge(badge_path, precision=0.9444, recall=1.0, f1=0.9714)
+
+    import json
+
+    data = json.loads(badge_path.read_text())
+    assert data["schemaVersion"] == 1
+    assert "94%" in data["message"]
+    assert "100%" in data["message"]
+    assert data["color"] == "brightgreen"
