@@ -1,0 +1,7 @@
+- id: dlp-scan
+  name: DLP secret & PII scan
+  description: Scans staged files for secrets and PII before commit.
+  entry: dlp-scan
+  language: python
+  types: [text]
+  args: ["--fail-on", "high", "--format", "table"]

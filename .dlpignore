@@ -1,0 +1,5 @@
+# Benchmark fixtures and test files are deliberately seeded with fake
+# secrets/PII for testing detector accuracy - they are not real leaked
+# credentials, so we exclude them from the repository's own self-scan in CI.
+benchmark/corpus/*
+tests/*

@@ -1,0 +1,42 @@
+name: "DLP Secret & PII Scanner"
+description: "Scans the repository for secrets and PII and fails the build above a configurable severity."
+author: "John-Axe"
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  path:
+    description: "Path to scan (default: repository root)."
+    required: false
+    default: "."
+  fail-on:
+    description: "Minimum severity that fails the action: low, medium, high, critical, none."
+    required: false
+    default: "high"
+  format:
+    description: "Output format: table or json."
+    required: false
+    default: "table"
+  entropy-threshold:
+    description: "Shannon entropy threshold for the entropy detector."
+    required: false
+    default: "4.3"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install dlp-secret-pii-scanner
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+    - name: Run scan
+      shell: bash
+      run: |
+        dlp-scan "${{ inputs.path }}" \
+          --fail-on "${{ inputs.fail-on }}" \
+          --format "${{ inputs.format }}" \
+          --entropy-threshold "${{ inputs.entropy-threshold }}"

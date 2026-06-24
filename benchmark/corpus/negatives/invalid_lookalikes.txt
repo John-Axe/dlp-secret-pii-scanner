@@ -1,0 +1,4 @@
+Internal reference numbers that look sensitive but are not.
+
+Invalid SSN-shaped placeholder used in form validation tests: 000-12-3456
+Invoice number that fails a Luhn check (not a real card number): 1234-5678-9012-3456

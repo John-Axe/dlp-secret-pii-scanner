@@ -1,0 +1,16 @@
+service:
+  name: widget-service
+  port: 8080
+
+storage:
+  bucket: widget-thumbnails
+  region: us-east-1
+
+credentials:
+  aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+  aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+  database_password: ${DATABASE_PASSWORD}
+
+logging:
+  level: info
+  format: json

@@ -1,0 +1,6 @@
+Support runbook: resetting a user's password
+
+If a user forgets their password, direct them to the self-service reset
+page. Support agents must never ask a user for their password over chat
+or email. Order reference numbers in our system look like ORD-2024-118402
+and are not sensitive. Ticket volume this week was up 12% over last week.

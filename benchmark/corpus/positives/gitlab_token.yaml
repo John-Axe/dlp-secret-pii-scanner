@@ -1,0 +1,3 @@
+# PLANTED FAKE TOKEN for benchmark testing only
+ci_variables:
+  GITLAB_TOKEN: glpat-0000000000000000000A
