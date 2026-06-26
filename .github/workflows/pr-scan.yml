@@ -17,6 +17,8 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
+    env:
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -30,13 +32,13 @@ jobs:
         run: pip install -e .
 
       - name: Fetch base ref
-        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+        run: git fetch origin "$BASE_REF" --depth=1
 
       - name: Diff-only scan (JSON, for inline comments)
         id: json_scan
         continue-on-error: true
         run: |
-          dlp-scan --diff-only --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
+          dlp-scan --diff-only --base-ref "origin/$BASE_REF" \
             --baseline .dlp-baseline.json \
             --format json --fail-on high > findings.json
 
@@ -49,7 +51,7 @@ jobs:
       - name: Diff-only scan (SARIF, for Security tab)
         if: always()
         run: |
-          dlp-scan --diff-only --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
+          dlp-scan --diff-only --base-ref "origin/$BASE_REF" \
             --baseline .dlp-baseline.json --format sarif --fail-on none > results.sarif
 
       - name: Upload SARIF to the Security tab
