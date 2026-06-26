@@ -80,7 +80,7 @@ recall drops below 85% (`benchmark/run_benchmark.py --min-precision --min-recall
 - Slack tokens
 - JWTs
 - RSA / EC / OpenSSH / DSA / PGP private key blocks
-- Generic `password=` / `pwd:` assignments
+- Generic `password=` / `pwd:` assignments <!-- dlp-ignore -->
 - Email addresses
 - US Social Security Numbers (with basic validity checks on the area/group/serial)
 - Credit card numbers (validated with the Luhn checksum to cut down on false positives)
