@@ -3,3 +3,4 @@
 # credentials, so we exclude them from the repository's own self-scan in CI.
 benchmark/corpus/*
 tests/*
+*.egg-info/*
