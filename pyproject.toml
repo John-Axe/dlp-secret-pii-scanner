@@ -19,7 +19,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "atheris>=2.3"]
+dev = ["pytest==9.1.1", "atheris==3.1.0"]
 
 [project.scripts]
 dlp-scan = "dlp.cli:main"

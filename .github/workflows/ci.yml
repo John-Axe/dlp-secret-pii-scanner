@@ -24,8 +24,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
       - name: Install package
-        run: pip install -e ".[dev]"
+        run: pip install --no-deps -e .
 
       - name: Run pytest
         run: pytest -v
@@ -48,8 +51,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install package and atheris
-        run: pip install atheris -e .
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      - name: Install package
+        run: pip install --no-deps -e .
 
       - name: Run fuzz target (smoke, 10 000 iterations)
         run: python fuzz/fuzz_scanner.py -runs=10000
@@ -68,7 +74,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install package
-        run: pip install -e .
+        run: pip install --no-deps -e .
 
       - name: Self-scan in SARIF mode
         run: dlp-scan . --baseline .dlp-baseline.json --format sarif --fail-on none > results.sarif
@@ -92,7 +98,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install package
-        run: pip install -e .
+        run: pip install --no-deps -e .
 
       - name: Update benchmark precision/recall badge
         run: |
