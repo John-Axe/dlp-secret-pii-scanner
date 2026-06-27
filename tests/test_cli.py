@@ -129,7 +129,7 @@ def test_cli_diff_only_no_changed_files_means_no_findings(tmp_path: Path, capsys
 
 
 def test_cli_no_entropy_flag(tmp_path: Path, capsys):
-    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
 
     main([str(tmp_path), "--no-entropy", "--format", "json", "--fail-on", "none"])
     findings = __import__("json").loads(capsys.readouterr().out)
@@ -138,7 +138,7 @@ def test_cli_no_entropy_flag(tmp_path: Path, capsys):
 
 
 def test_cli_entropy_threshold_excludes_below_threshold(tmp_path: Path, capsys):
-    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
 
     main([str(tmp_path), "--entropy-threshold", "6.0", "--format", "json", "--fail-on", "none"])
     findings = __import__("json").loads(capsys.readouterr().out)
