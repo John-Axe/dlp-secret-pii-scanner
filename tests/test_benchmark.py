@@ -4,6 +4,7 @@ and an end-to-end check that the shipped corpus clears the documented gate.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -64,8 +65,6 @@ def test_write_badge_produces_shields_io_endpoint_schema(tmp_path):
     badge_path = tmp_path / "badges" / "benchmark.json"
 
     write_badge(badge_path, precision=0.9444, recall=1.0, f1=0.9714)
-
-    import json
 
     data = json.loads(badge_path.read_text())
     assert data["schemaVersion"] == 1

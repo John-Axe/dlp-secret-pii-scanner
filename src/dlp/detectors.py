@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -26,7 +27,7 @@ class Detector:
     name: str
     severity: str
     pattern: "re.Pattern[str]"
-    validator: "callable | None" = None
+    validator: Callable[[str, re.Match[str]], bool] | None = None
 
     def scan_line(self, line: str) -> list[Match]:
         matches = []

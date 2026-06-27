@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dlp.cli import main
@@ -37,8 +38,6 @@ def test_cli_json_format_outputs_valid_json(tmp_path: Path, capsys):
     main([str(tmp_path), "--format", "json", "--fail-on", "none"])
     captured = capsys.readouterr()
 
-    import json
-
     findings = json.loads(captured.out)
     assert any(f["rule_id"] == "aws_access_key_id" for f in findings)
 
@@ -56,8 +55,6 @@ def test_cli_sarif_format_outputs_valid_sarif(tmp_path: Path, capsys):
 
     main([str(tmp_path), "--format", "sarif", "--fail-on", "none"])
     captured = capsys.readouterr()
-
-    import json
 
     sarif = json.loads(captured.out)
     assert sarif["version"] == "2.1.0"
@@ -77,8 +74,6 @@ def test_cli_write_baseline_then_baseline_suppresses_known_finding(tmp_path: Pat
         [str(tmp_path), "--baseline", str(baseline_path), "--fail-on", "high", "--format", "json"]
     )
     captured = capsys.readouterr()
-
-    import json
 
     findings = json.loads(captured.out)
     assert findings == []
@@ -110,8 +105,6 @@ def test_cli_diff_only_scans_only_changed_files(tmp_path: Path, capsys, monkeypa
     main(["--diff-only", "--format", "json", "--fail-on", "none"])
     captured = capsys.readouterr()
 
-    import json
-
     findings = json.loads(captured.out)
     assert all(f["rule_id"] == "aws_access_key_id" for f in findings)
     assert findings
@@ -132,7 +125,7 @@ def test_cli_no_entropy_flag(tmp_path: Path, capsys):
     (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
 
     main([str(tmp_path), "--no-entropy", "--format", "json", "--fail-on", "none"])
-    findings = __import__("json").loads(capsys.readouterr().out)
+    findings = json.loads(capsys.readouterr().out)
 
     assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
 
@@ -141,7 +134,7 @@ def test_cli_entropy_threshold_excludes_below_threshold(tmp_path: Path, capsys):
     (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
 
     main([str(tmp_path), "--entropy-threshold", "6.0", "--format", "json", "--fail-on", "none"])
-    findings = __import__("json").loads(capsys.readouterr().out)
+    findings = json.loads(capsys.readouterr().out)
 
     assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
 
@@ -170,6 +163,6 @@ def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.setattr(cli_module.diff, "changed_files", lambda base_ref, root: [changed])
 
     main(["--diff-only", "--baseline", str(baseline_path), "--format", "json", "--fail-on", "none"])
-    findings = __import__("json").loads(capsys.readouterr().out)
+    findings = json.loads(capsys.readouterr().out)
 
     assert findings == []

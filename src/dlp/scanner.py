@@ -76,7 +76,7 @@ def scan_file(
             header = fh.read(8192)
             if not header or _is_probably_binary(header):
                 return []
-            rest = fh.read()
+            rest = fh.read(MAX_FILE_SIZE_BYTES)
         data = header + rest
     except OSError:
         return []

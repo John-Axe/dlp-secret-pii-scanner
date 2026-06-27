@@ -12,7 +12,6 @@ from .scanner import Finding
 
 
 def load_baseline(path: Path) -> set[str]:
-    path = Path(path)
     if not path.is_file():
         return set()
     try:
@@ -24,7 +23,6 @@ def load_baseline(path: Path) -> set[str]:
 
 
 def write_baseline(path: Path, findings: list[Finding]) -> None:
-    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {"fingerprints": sorted({f.fingerprint for f in findings})}
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

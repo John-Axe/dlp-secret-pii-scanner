@@ -11,6 +11,7 @@ import importlib.util
 import sys
 import types
 import unittest.mock
+from pathlib import Path
 
 
 def _make_atheris_stub() -> types.ModuleType:
@@ -38,10 +39,7 @@ def _make_atheris_stub() -> types.ModuleType:
     return stub
 
 
-_FUZZ_SCRIPT = (
-    __file__
-    and __import__("pathlib").Path(__file__).parent.parent / "fuzz" / "fuzz_scanner.py"
-)
+_FUZZ_SCRIPT = Path(__file__).parent.parent / "fuzz" / "fuzz_scanner.py"
 
 
 def test_fuzz_target_imports_and_runs():

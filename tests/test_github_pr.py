@@ -9,6 +9,8 @@ import io
 import json
 import urllib.error
 
+import pytest
+
 from dlp import github_pr
 from dlp.scanner import Finding
 
@@ -86,13 +88,11 @@ def test_post_review_comments_reraises_other_http_errors(monkeypatch):
 
     monkeypatch.setattr(github_pr.urllib.request, "urlopen", fake_urlopen)
 
-    try:
+    with pytest.raises(urllib.error.HTTPError) as exc_info:
         github_pr.post_review_comments(
             [FINDING], repo="acme/widgets", pull_number=42, commit_sha="abc123", token="tok"
         )
-        assert False, "expected HTTPError to propagate"
-    except urllib.error.HTTPError as exc:
-        assert exc.code == 500
+    assert exc_info.value.code == 500
 
 
 def test_main_skips_when_env_vars_missing(tmp_path, monkeypatch, capsys):

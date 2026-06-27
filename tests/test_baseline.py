@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+import pytest
 
 from dlp import baseline
 from dlp.scanner import scan_file
@@ -80,7 +83,6 @@ def test_write_baseline_empty_findings(tmp_path: Path):
     path = tmp_path / "baseline.json"
     baseline.write_baseline(path, [])
 
-    import json
     data = json.loads(path.read_text())
     assert data == {"fingerprints": []}
 
@@ -89,6 +91,5 @@ def test_load_baseline_malformed_json(tmp_path: Path):
     path = tmp_path / "bad.json"
     path.write_text("{not valid json")
 
-    import pytest
     with pytest.raises(ValueError, match="invalid JSON"):
         baseline.load_baseline(path)
