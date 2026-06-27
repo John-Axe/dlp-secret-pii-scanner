@@ -7,6 +7,7 @@ pytest run, before the dedicated CI fuzz job runs.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import sys
 import types
 import unittest.mock
@@ -37,12 +38,19 @@ def _make_atheris_stub() -> types.ModuleType:
     return stub
 
 
+_FUZZ_SCRIPT = (
+    __file__
+    and __import__("pathlib").Path(__file__).parent.parent / "fuzz" / "fuzz_scanner.py"
+)
+
+
 def test_fuzz_target_imports_and_runs():
     atheris_stub = _make_atheris_stub()
+    spec = importlib.util.spec_from_file_location("fuzz_scanner", _FUZZ_SCRIPT)
     with unittest.mock.patch.dict(sys.modules, {"atheris": atheris_stub}):
-        # Force re-import with stub in place
-        fuzz_mod = importlib.import_module("fuzz.fuzz_scanner")
-        importlib.reload(fuzz_mod)
+        fuzz_mod = importlib.util.module_from_spec(spec)
+        sys.modules.pop("fuzz_scanner", None)
+        spec.loader.exec_module(fuzz_mod)
 
         fuzz_mod.TestOneInput(b"AKIAIOSFODNN7EXAMPLE")
         fuzz_mod.TestOneInput(b"password = 'hunter2'")
