@@ -15,8 +15,11 @@ def load_baseline(path: Path) -> set[str]:
     path = Path(path)
     if not path.is_file():
         return set()
-    with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Baseline file '{path}' contains invalid JSON: {exc}") from exc
     return set(data.get("fingerprints", []))
 
 

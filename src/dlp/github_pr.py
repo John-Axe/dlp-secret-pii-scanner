@@ -22,9 +22,10 @@ USER_AGENT = "dlp-secret-pii-scanner"
 
 
 def build_comment_payload(finding: Finding, commit_sha: str) -> dict:
+    safe_redacted = finding.redacted.replace("`", "*")
     body = (
         f"**DLP scan: {finding.severity.upper()} — {finding.rule_name}** (`{finding.rule_id}`)\n\n"
-        f"Possible secret/PII detected: `{finding.redacted}`.\n\n"
+        f"Possible secret/PII detected: `{safe_redacted}`.\n\n"
         "If this is a false positive, suppress it with a trailing `# dlp-ignore` comment "
         "or a `.dlpignore` pattern."
     )
@@ -105,9 +106,20 @@ def main(argv: list[str] | None = None) -> int:
     pull_number = pull_request["number"]
     commit_sha = pull_request["head"]["sha"]
 
-    with open(args.findings_json, encoding="utf-8") as fh:
-        raw_findings = json.load(fh)
-    findings = [Finding(**item) for item in raw_findings]
+    try:
+        with open(args.findings_json, encoding="utf-8") as fh:
+            raw_findings = json.load(fh)
+    except FileNotFoundError:
+        print(f"Findings file not found: {args.findings_json}", file=sys.stderr)
+        return 1
+    except json.JSONDecodeError as exc:
+        print(f"Findings file contains invalid JSON: {exc}", file=sys.stderr)
+        return 1
+    try:
+        findings = [Finding(**item) for item in raw_findings]
+    except TypeError as exc:
+        print(f"Findings file has unexpected schema: {exc}", file=sys.stderr)
+        return 1
 
     if not findings:
         print("No findings to comment on.")

@@ -122,6 +122,66 @@ def test_main_skips_when_not_a_pull_request_event(tmp_path, monkeypatch):
     assert exit_code == 0
 
 
+def test_main_missing_findings_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "acme/widgets")
+    event_path = tmp_path / "event.json"
+    event_path.write_text('{"pull_request": {"number": 1, "head": {"sha": "abc"}}}')
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_path))
+
+    exit_code = github_pr.main([str(tmp_path / "missing.json")])
+
+    assert exit_code == 1
+    assert "not found" in capsys.readouterr().err
+
+
+def test_main_malformed_findings_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "acme/widgets")
+    event_path = tmp_path / "event.json"
+    event_path.write_text('{"pull_request": {"number": 1, "head": {"sha": "abc"}}}')
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_path))
+    bad = tmp_path / "findings.json"
+    bad.write_text("{not json")
+
+    exit_code = github_pr.main([str(bad)])
+
+    assert exit_code == 1
+    assert "invalid JSON" in capsys.readouterr().err
+
+
+def test_main_wrong_schema_findings(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "acme/widgets")
+    event_path = tmp_path / "event.json"
+    event_path.write_text('{"pull_request": {"number": 1, "head": {"sha": "abc"}}}')
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_path))
+    bad = tmp_path / "findings.json"
+    bad.write_text('[{"unexpected_field": "value"}]')
+
+    exit_code = github_pr.main([str(bad)])
+
+    assert exit_code == 1
+    assert "unexpected schema" in capsys.readouterr().err
+
+
+def test_build_comment_payload_backtick_in_redacted_is_safe():
+    finding_with_backtick = Finding(
+        file="src/app.py",
+        line=5,
+        column=1,
+        rule_id="generic_password",
+        rule_name="Generic Password Assignment",
+        severity="medium",
+        redacted="pa****`lue",
+    )
+    payload = github_pr.build_comment_payload(finding_with_backtick, commit_sha="abc")
+    body = payload["body"]
+    # Ensure no unmatched backtick breaks a code span
+    backtick_count = body.count("`")
+    assert backtick_count % 2 == 0
+
+
 def test_main_posts_comments_for_pull_request_event(tmp_path, monkeypatch):
     event_path = tmp_path / "event.json"
     event_path.write_text(

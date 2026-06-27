@@ -134,3 +134,48 @@ def test_severity_at_least(low, high, expected):
 def test_severity_rank_unknown_raises():
     with pytest.raises(ValueError):
         severity.rank("not-a-severity")
+
+
+def test_severity_at_least_none_raises():
+    with pytest.raises(ValueError):
+        severity.at_least("low", "none")
+
+
+def test_has_inline_ignore_requires_comment_marker(tmp_path):
+    target = tmp_path / "code.py"
+    target.write_text(
+        'dlp_ignore_var = "AKIAIOSFODNN7EXAMPLE"\n'
+        'real_key = "AKIAIOSFODNN7EXAMPLE"  # dlp-ignore\n'
+    )
+    findings = scan_file(target)
+    lines = {f.line for f in findings if f.rule_id == "aws_access_key_id"}
+    assert 1 in lines
+    assert 2 not in lines
+
+
+def test_is_path_ignored_windows_backslash():
+    assert is_path_ignored("vendor\\lib\\secret.txt", ["vendor/*"])
+
+
+def test_fingerprint_stable_across_line_number_changes(tmp_path):
+    secret = "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
+    f1 = (tmp_path / "a.txt")
+    f1.write_text(f"{secret}\n")
+    f2 = (tmp_path / "b.txt")
+    f2.write_text(f"# comment\n# comment\n{secret}\n")
+
+    fp1 = scan_file(f1, display_path="same.txt")[0].fingerprint
+    fp2 = scan_file(f2, display_path="same.txt")[0].fingerprint
+    assert fp1 == fp2
+
+
+def test_scan_file_skips_symlinks(tmp_path):
+    real = tmp_path / "real.txt"
+    real.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    link = tmp_path / "link.txt"
+    link.symlink_to(real)
+
+    findings = scan_paths([tmp_path])
+    filenames = {Path(f.file).name for f in findings}
+    assert "link.txt" not in filenames
+    assert "real.txt" in filenames

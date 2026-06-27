@@ -28,7 +28,7 @@ jobs:
         run: pip install -r requirements/dev.txt
 
       - name: Install package
-        run: pip install --no-deps -e .
+        run: pip install -e .
 
       - name: Run pytest
         run: pytest -v
@@ -55,7 +55,7 @@ jobs:
         run: pip install -r requirements/dev.txt
 
       - name: Install package
-        run: pip install --no-deps -e .
+        run: pip install -e .
 
       - name: Run fuzz target (smoke, 10 000 iterations)
         run: python fuzz/fuzz_scanner.py -runs=10000
@@ -74,7 +74,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install package
-        run: pip install --no-deps -e .
+        run: pip install -e .
 
       - name: Self-scan in SARIF mode
         run: dlp-scan . --baseline .dlp-baseline.json --format sarif --fail-on none > results.sarif
@@ -98,7 +98,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install package
-        run: pip install --no-deps -e .
+        run: pip install -e .
 
       - name: Update benchmark precision/recall badge
         run: |

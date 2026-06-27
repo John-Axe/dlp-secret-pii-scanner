@@ -35,8 +35,13 @@ runs:
       run: pip install "${{ github.action_path }}"
     - name: Run scan
       shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_ENTROPY: ${{ inputs.entropy-threshold }}
       run: |
-        dlp-scan "${{ inputs.path }}" \
-          --fail-on "${{ inputs.fail-on }}" \
-          --format "${{ inputs.format }}" \
-          --entropy-threshold "${{ inputs.entropy-threshold }}"
+        dlp-scan "$INPUT_PATH" \
+          --fail-on "$INPUT_FAIL_ON" \
+          --format "$INPUT_FORMAT" \
+          --entropy-threshold "$INPUT_ENTROPY"

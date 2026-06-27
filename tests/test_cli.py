@@ -126,3 +126,50 @@ def test_cli_diff_only_no_changed_files_means_no_findings(tmp_path: Path, capsys
     exit_code = main(["--diff-only", "--fail-on", "high"])
 
     assert exit_code == 0
+
+
+def test_cli_no_entropy_flag(tmp_path: Path, capsys):
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")
+
+    main([str(tmp_path), "--no-entropy", "--format", "json", "--fail-on", "none"])
+    findings = __import__("json").loads(capsys.readouterr().out)
+
+    assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
+
+
+def test_cli_entropy_threshold_excludes_below_threshold(tmp_path: Path, capsys):
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")
+
+    main([str(tmp_path), "--entropy-threshold", "6.0", "--format", "json", "--fail-on", "none"])
+    findings = __import__("json").loads(capsys.readouterr().out)
+
+    assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
+
+
+def test_cli_table_format(tmp_path: Path, capsys):
+    (tmp_path / "creds.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    main([str(tmp_path), "--format", "table", "--fail-on", "none"])
+    out = capsys.readouterr().out
+
+    assert "SEVERITY" in out
+    assert "aws_access_key_id" in out
+
+
+def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    changed = tmp_path / "changed.txt"
+    changed.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    baseline_path = tmp_path / "baseline.json"
+
+    main([".", "--write-baseline", str(baseline_path)])
+    capsys.readouterr()
+
+    from dlp import cli as cli_module
+
+    monkeypatch.setattr(cli_module.diff, "changed_files", lambda base_ref, root: [changed])
+
+    main(["--diff-only", "--baseline", str(baseline_path), "--format", "json", "--fail-on", "none"])
+    findings = __import__("json").loads(capsys.readouterr().out)
+
+    assert findings == []

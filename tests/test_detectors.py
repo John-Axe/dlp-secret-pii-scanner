@@ -151,3 +151,62 @@ def test_redact_long_string_keeps_prefix_and_suffix():
     assert redacted.startswith("AKIA")
     assert redacted.endswith("MPLE")
     assert "*" in redacted
+
+
+def test_redact_nine_char_exposes_at_most_four_chars():
+    redacted = detectors.redact("123456789")
+    assert len(redacted.replace("*", "")) <= 4
+
+
+def test_redact_ssn_exposes_few_chars():
+    redacted = detectors.redact("123-45-6789")
+    assert len(redacted.replace("*", "")) <= 4
+
+
+def test_redact_backtick_replaced():
+    result = detectors.redact("pass`word`value!!")
+    assert "`" not in result
+
+
+def test_luhn_ok_too_many_digits():
+    assert not _fires("credit_card", "too long: 41111111111111111112")
+
+
+def test_ssn_ok_area_666_rejected():
+    assert not _fires("us_ssn", "SSN: 666-12-3456")
+
+
+def test_ssn_ok_area_starts_with_9_rejected():
+    assert not _fires("us_ssn", "SSN: 900-12-3456")
+
+
+def test_ssn_ok_serial_0000_rejected():
+    assert not _fires("us_ssn", "SSN: 123-45-0000")
+
+
+def test_ssn_ok_group_00_rejected():
+    assert not _fires("us_ssn", "SSN: 123-00-6789")
+
+
+def test_github_token_gho_prefix():
+    assert _fires("github_token", 'token = "gho_00000000000000000000000000000000000A"')
+
+
+def test_github_token_ghu_prefix():
+    assert _fires("github_token", 'token = "ghu_00000000000000000000000000000000000A"')
+
+
+def test_github_token_ghs_prefix():
+    assert _fires("github_token", 'token = "ghs_00000000000000000000000000000000000A"')
+
+
+def test_github_token_ghr_prefix():
+    assert _fires("github_token", 'token = "ghr_00000000000000000000000000000000000A"')
+
+
+def test_shannon_entropy_empty_string():
+    assert detectors.shannon_entropy("") == 0.0
+
+
+def test_private_key_block_public_key_negative():
+    assert not _fires("private_key_block", "-----BEGIN RSA PUBLIC KEY-----")

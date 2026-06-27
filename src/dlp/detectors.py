@@ -186,7 +186,18 @@ def all_rule_metadata() -> list[dict]:
 
 
 def redact(text: str) -> str:
-    """Show a short, non-sensitive preview of a matched secret."""
-    if len(text) <= 8:
-        return "*" * len(text)
-    return f"{text[:4]}{'*' * (len(text) - 8)}{text[-4:]}"
+    """Show a short, non-sensitive preview of a matched secret.
+
+    Shorter secrets (9-15 chars) show only 2 chars on each end to avoid
+    exposing SSNs, short tokens, etc. Longer secrets show 4 chars on each
+    end. Backticks are replaced with '*' to prevent markdown code-span
+    breakage when the redacted value appears in PR review comments.
+    """
+    n = len(text)
+    if n <= 8:
+        return "*" * n
+    visible = 2 if n < 16 else 4
+    prefix = text[:visible]
+    suffix = text[-visible:]
+    stars = "*" * max(4, n - 2 * visible)
+    return f"{prefix}{stars}{suffix}".replace("`", "*")

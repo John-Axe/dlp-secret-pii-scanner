@@ -51,6 +51,8 @@ def _iter_files(root: Path, ignore_patterns: list[str], ignore_base: Path):
         yield root
         return
     for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            continue
         if not path.is_file():
             continue
         if any(part in DEFAULT_SKIP_DIRS for part in path.parts):
@@ -70,10 +72,15 @@ def scan_file(
 ) -> list[Finding]:
     display = display_path if display_path is not None else str(path)
     try:
-        data = path.read_bytes()
+        with path.open("rb") as fh:
+            header = fh.read(8192)
+            if not header or _is_probably_binary(header):
+                return []
+            rest = fh.read()
+        data = header + rest
     except OSError:
         return []
-    if not data or _is_probably_binary(data) or len(data) > MAX_FILE_SIZE_BYTES:
+    if len(data) > MAX_FILE_SIZE_BYTES:
         return []
 
     text = data.decode("utf-8", errors="ignore")

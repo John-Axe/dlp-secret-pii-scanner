@@ -66,3 +66,29 @@ def test_filter_known_keeps_unmatched_findings(tmp_path: Path):
     remaining = baseline.filter_known(findings, {"not-a-real-fingerprint"})
 
     assert remaining == findings
+
+
+def test_filter_known_empty_set_returns_all(tmp_path: Path):
+    target = tmp_path / "creds.txt"
+    target.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    findings = scan_file(target, display_path="creds.txt")
+
+    assert baseline.filter_known(findings, set()) == findings
+
+
+def test_write_baseline_empty_findings(tmp_path: Path):
+    path = tmp_path / "baseline.json"
+    baseline.write_baseline(path, [])
+
+    import json
+    data = json.loads(path.read_text())
+    assert data == {"fingerprints": []}
+
+
+def test_load_baseline_malformed_json(tmp_path: Path):
+    path = tmp_path / "bad.json"
+    path.write_text("{not valid json")
+
+    import pytest
+    with pytest.raises(ValueError, match="invalid JSON"):
+        baseline.load_baseline(path)

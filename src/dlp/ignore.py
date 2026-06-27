@@ -10,10 +10,11 @@ Two layers:
 from __future__ import annotations
 
 import fnmatch
+import re
 from pathlib import Path
 
 DLPIGNORE_FILENAME = ".dlpignore"
-INLINE_MARKER = "dlp-ignore"
+_INLINE_IGNORE_RE = re.compile(r"(?:#|//)\s*dlp-ignore\b")
 
 
 def load_dlpignore(root: Path) -> list[str]:
@@ -41,4 +42,4 @@ def is_path_ignored(rel_path: str, patterns: list[str]) -> bool:
 
 
 def has_inline_ignore(line: str) -> bool:
-    return INLINE_MARKER in line
+    return bool(_INLINE_IGNORE_RE.search(line))
