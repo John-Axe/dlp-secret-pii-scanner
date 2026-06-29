@@ -108,7 +108,7 @@ def test_scan_paths_without_ignore_root_falls_back_to_per_file_parent(tmp_path: 
 
 def test_entropy_detector_can_be_disabled(tmp_path: Path):
     target = tmp_path / "secret.txt"
-    target.write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")
+    target.write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
 
     with_entropy = scan_file(target, enable_entropy=True)
     without_entropy = scan_file(target, enable_entropy=False)

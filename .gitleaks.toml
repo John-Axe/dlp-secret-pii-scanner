@@ -1,0 +1,15 @@
+title = "DLP Scanner Gitleaks Config"
+
+[allowlist]
+  description = "Suppress false positives from benchmark corpus and test fixtures"
+
+  # benchmark/corpus/ is intentionally filled with fake secrets for precision/recall testing
+  paths = [
+    '''benchmark/corpus/''',
+  ]
+
+  # kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt is a synthetic test token used in unit tests;
+  # it appears in older commits before inline gitleaks:allow comments were added
+  regexes = [
+    '''kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt''',
+  ]

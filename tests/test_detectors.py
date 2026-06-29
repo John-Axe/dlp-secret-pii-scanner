@@ -119,7 +119,7 @@ def test_credit_card_negative_too_short():
 
 def test_entropy_detector_positive():
     matches = detectors.scan_line_entropy(
-        "API_SIGNING_SECRET=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt", threshold=4.3
+        "API_SIGNING_SECRET=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt", threshold=4.3  # gitleaks:allow
     )
     assert matches
 
