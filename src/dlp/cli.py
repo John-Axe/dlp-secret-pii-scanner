@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import baseline, diff, report, severity
 from .scanner import DEFAULT_ENTROPY_THRESHOLD, scan_paths
+from .shared_finding import write_shared_findings_jsonl
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,6 +73,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write the current findings to a baseline file (as fingerprints) and exit.",
     )
+    parser.add_argument(
+        "--emit-findings",
+        type=Path,
+        default=None,
+        help="Also write findings.jsonl (shared ecosystem finding schema) to this path, "
+        "for observability-stack's Promtail to tail. Overwritten each run.",
+    )
     return parser
 
 
@@ -106,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.baseline:
         known = baseline.load_baseline(args.baseline)
         findings = baseline.filter_known(findings, known)
+
+    if args.emit_findings:
+        write_shared_findings_jsonl(findings, args.emit_findings)
 
     if args.format == "json":
         print(report.to_json(findings))
