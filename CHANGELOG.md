@@ -12,6 +12,11 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `CONTRIBUTING.md`'s Testing philosophy section: a short note on
+  `test_committed_badge_matches_fresh_run`, which doesn't fit any of the
+  five existing test categories — it checks a *committed artifact*
+  hasn't drifted from its source, not detector correctness, a distinct
+  kind of test this repo now has a real, non-hypothetical example of.
 - `docs/Benchmark-Methodology.md`: a plain-English "What precision and
   recall mean here" primer before the exact formulas, a fixture-category
   breakdown of the corpus (straightforward/multi-rule/format-diversity/
