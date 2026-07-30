@@ -12,6 +12,12 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Limitations.md` — detection-coverage, file-size, performance, and
+  ecosystem-integration limitations consolidated in one place, plus what the
+  tool deliberately doesn't do (remediate, scan git history, verify a found
+  credential is live). Every claim grounded in the current implementation,
+  not a hedge — several were verified against actual behavior (e.g. the CI
+  workflow's fail/pass gate) while writing this, not assumed.
 - `-v`/`--verbose` logs the resolved scan configuration and a completion
   summary (finding count, elapsed time) to stderr; `-q`/`--quiet` suppresses
   the skipped-files stderr notice too. Neither affects stdout findings
