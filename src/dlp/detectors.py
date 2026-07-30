@@ -66,7 +66,13 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="aws_access_key_id",
         name="AWS Access Key ID",
         severity="high",
-        pattern=re.compile(r"\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b"),
+        # AKIA (long-term access key) and ASIA (temporary/STS access key)
+        # only - AWS's other unique-ID prefixes sharing this 4-letter+16-char
+        # shape (AGPA/AIDA/AIPA/ANPA/ANVA/AROA) are non-secret resource
+        # identifiers (user group/IAM user/instance profile/managed policy/
+        # policy version/role), not credentials. See docs/Detectors.md and
+        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes.
+        pattern=re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     ),
     Detector(
         rule_id="aws_secret_key",
@@ -80,7 +86,11 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="github_token",
         name="GitHub Token",
         severity="high",
-        pattern=re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36}\b"),
+        # Classic tokens (ghp_/gho_/ghu_/ghs_/ghr_, 36 chars) plus
+        # fine-grained personal access tokens (github_pat_, 82 chars -
+        # format verified against gitleaks' public config, since GitHub's
+        # own docs state the prefix but not the exact length/charset).
+        pattern=re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_\w{82})\b"),
     ),
     Detector(
         rule_id="gitlab_token",
@@ -104,7 +114,13 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="private_key_block",
         name="Private Key Block",
         severity="critical",
-        pattern=re.compile(r"-----BEGIN (?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY-----"),
+        # Algorithm-prefixed PEM headers (RSA/EC/OpenSSH/DSA/PGP), plus
+        # PKCS#8 (RFC 5958), which has no algorithm prefix - both the
+        # unencrypted ("BEGIN PRIVATE KEY") and encrypted
+        # ("BEGIN ENCRYPTED PRIVATE KEY") forms, e.g. openssl genpkey output.
+        pattern=re.compile(
+            r"-----BEGIN (?:(?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY|(?:ENCRYPTED )?PRIVATE KEY)-----"
+        ),
     ),
     Detector(
         rule_id="generic_password",

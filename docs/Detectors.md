@@ -30,27 +30,27 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `aws_access_key_id` — AWS Access Key ID
 
 - **Severity**: `high`
-- **Pattern**: `\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b`
+- **Pattern**: `\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`
 - **Detection strategy**: AWS unique identifiers are a fixed-length,
   base32-ish alphabet (`[0-9A-Z]`) string with a stable 4-letter prefix
-  denoting resource type. This pattern matches any of 8 known prefixes
-  followed by exactly 16 such characters — no validator, since the prefix
-  set itself is the signal.
-- **Known false positive, verified against AWS's own docs**: only 2 of the
-  8 matched prefixes are actually *credentials*. Per
-  [AWS's IAM unique-ID-prefix reference](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes):
+  denoting resource type. This pattern matches the two prefixes that are
+  actually credentials — no validator, since the prefix set itself is the
+  signal.
+- **Verified against AWS's own docs, and narrowed accordingly**: per
+  [AWS's IAM unique-ID-prefix reference](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes),
   `AKIA` is a long-term access key and `ASIA` is a temporary (STS) access
-  key ID — real secrets. The other six this pattern also matches are
-  **not credentials at all**: `AGPA` (user group), `AIDA` (IAM user),
-  `AIPA` (EC2 instance profile), `ANPA` (managed policy), `ANVA` (managed
-  policy version), `AROA` (role) are AWS's internal unique *resource*
-  identifiers — the same kind of thing as a database primary key, sharing
-  this format by convention, not a secret. A `AROA...`/`AIDA...`/etc.
-  string appearing in an IAM policy `Condition` block (a documented,
-  normal usage — see the AWS reference above) will fire this rule despite
-  not being sensitive. This was true of this pattern from the project's
-  first commit and had never been checked against AWS's own prefix table
-  until this doc was written.
+  key ID — real secrets. This pattern originally also matched six other
+  prefixes sharing the same 4-letter+16-character shape (`AGPA` user
+  group, `AIDA` IAM user, `AIPA` EC2 instance profile, `ANPA` managed
+  policy, `ANVA` managed policy version, `AROA` role) that are AWS's
+  internal *resource* identifiers, not credentials — the same kind of
+  thing as a database primary key, sharing this format by convention. A
+  `AROA...`/`AIDA...`/etc. string appearing in an IAM policy `Condition`
+  block (a documented, normal usage — see the AWS reference above) fired
+  this rule despite not being sensitive. Fixed by narrowing the pattern
+  to just `AKIA`/`ASIA` — `tests/test_detectors.py`'s
+  `test_aws_access_key_id_negative_resource_id_prefixes` covers the
+  regression.
 - **Known false negative**: prefixes not in this set (`ABIA` bearer
   tokens, `ACCA` context-specific credentials, `APKA` public keys, `ASCA`
   certificates — also from the same AWS reference) aren't matched at all.
@@ -95,20 +95,26 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `github_token` — GitHub Token
 
 - **Severity**: `high`
-- **Pattern**: `\bgh[pousr]_[A-Za-z0-9]{36}\b`
-- **Detection strategy**: matches GitHub's five classic token prefixes in
-  one pattern via the `[pousr]` character class.
+- **Pattern**: `\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_\w{82})\b`
+- **Detection strategy**: matches GitHub's five classic token prefixes via
+  the `[pousr]` character class, plus fine-grained personal access tokens
+  (`github_pat_` + 82 characters) as a second alternative.
 - **Verified prefix meanings** (per [GitHub's own docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github)):
   `ghp_` personal access token (classic), `gho_` OAuth access token,
   `ghu_` GitHub App user access token, `ghs_` GitHub App installation
   access token, `ghr_` GitHub App refresh token — `tests/test_detectors.py`
   has a positive test for each of the five
   (`test_github_token_gho_prefix` etc.).
-- **Known false negative, verified against GitHub's own docs**: **fine-
-  grained personal access tokens use the `github_pat_` prefix**, a
-  different format entirely, introduced after this project's classic-only
-  pattern was written — this rule does not match them at all. This is a
-  real, previously-undocumented coverage gap, not a hypothetical one.
+- **Fine-grained PAT support, added after a real gap was found**: this
+  rule originally only matched the five classic prefixes above. GitHub's
+  own docs confirm fine-grained personal access tokens use a different
+  `github_pat_` prefix but don't publish the exact length/charset; the
+  `github_pat_\w{82}` shape was verified against
+  [gitleaks](https://github.com/gitleaks/gitleaks)'s public detection
+  config (`github_pat_\w{82}`, identical) rather than assumed. Covered by
+  `test_github_token_fine_grained_pat_positive` and
+  `test_github_token_fine_grained_pat_negative_wrong_length` (confirming
+  the length is exact, not a minimum).
 - **Known false positive**: `test_github_token_negative` — prose
   mentioning a URL like `github.com/ghp_examples` doesn't match, since
   the literal text after `ghp_` isn't 36 alphanumeric characters, but any
@@ -182,26 +188,30 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `private_key_block` — Private Key Block
 
 - **Severity**: `critical`
-- **Pattern**: `-----BEGIN (?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY-----`
+- **Pattern**: `-----BEGIN (?:(?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY|(?:ENCRYPTED )?PRIVATE KEY)-----`
 - **Detection strategy**: PEM-format private key headers are a fixed,
   unambiguous string — no shape-guessing needed, the header line itself
-  *is* the signal. Covers RSA, EC, OpenSSH, DSA, and PGP key types (the
-  optional space handles both `OPENSSH PRIVATE KEY` and the
-  no-space-variant header forms).
+  *is* the signal. Two alternatives: algorithm-prefixed headers (RSA, EC,
+  OpenSSH, DSA, PGP — the optional space handles both `OPENSSH PRIVATE
+  KEY` and the no-space-variant header forms), and PKCS#8 (RFC 5958)
+  headers, which carry no algorithm name at all — `PRIVATE KEY` alone, or
+  `ENCRYPTED PRIVATE KEY` for the encrypted variant.
+- **Fixed gap, previously false-negative**: this rule originally only
+  matched the algorithm-prefixed alternative — a bare
+  `-----BEGIN PRIVATE KEY-----` (PKCS#8 unencrypted, a common `openssl <!-- # dlp-ignore -->
+  genpkey` output format) or `-----BEGIN ENCRYPTED PRIVATE KEY-----` <!-- # dlp-ignore -->
+  passed through completely undetected, since neither contains any of the
+  five algorithm words the original pattern required. Fixed by adding a
+  second alternative for the algorithm-prefix-free PKCS#8 forms.
+  `test_private_key_block_pkcs8_unencrypted_positive` and
+  `_encrypted_positive` cover the regression.
 - **Known false positive**: essentially none by construction — this
   exact header string appearing anywhere means a private key block
   follows; there's no ambiguous case a validator would need to rule out.
 - **Known false negative**: `test_private_key_block_public_key_negative`
   documents the deliberate one — `-----BEGIN RSA PUBLIC KEY-----` (a
   *public* key, safe to share) correctly does not match, since the
-  pattern requires the literal word `PRIVATE`. Key types not in the
-  four-way alternation (e.g. an `EC PRIVATE KEY` is covered, but a
-  raw `-----BEGIN PRIVATE KEY-----` with no algorithm prefix — the
-  PKCS#8 unencrypted format — is **not** matched by this pattern, since
-  the regex requires one of the four listed algorithm words before
-  `PRIVATE KEY`). This is a real, previously-undocumented gap: PKCS#8
-  keys (a common `openssl genpkey` output format) without an algorithm
-  prefix in the header line pass through undetected.
+  pattern requires the literal word `PRIVATE`.
 - **Why `critical`**: a private key is immediately, directly usable —
   same tier as `aws_secret_key`.
 

@@ -11,6 +11,48 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Fixed
+- Inline suppression (`ignore._INLINE_IGNORE_RE`) required a literal `#`
+  or `//` before `dlp-ignore` — the `<!-- dlp-ignore -->` HTML-comment
+  style README.md already documented (and used on its own `## Detectors`
+  list) never actually worked, since an HTML comment has neither marker.
+  This had never mattered before because the one existing example
+  (`generic_password`) is `medium` severity, always under `--fail-on
+  critical` regardless of whether the suppression comment functioned.
+  Widened the regex to accept `<!--` as a third valid marker — a real
+  behavior change for every user of this tool, not a docs-only fix. As a
+  direct consequence, README.md's own `## Detectors` list line, which
+  was always intended to demonstrate this, now genuinely suppresses
+  itself (previously it silently didn't, and it never showed up because
+  nothing checked below `critical`).
+- `private_key_block` only matched algorithm-prefixed PEM headers (RSA,
+  EC, OpenSSH, DSA, PGP) — PKCS#8 (RFC 5958) headers, which carry no
+  algorithm name at all, weren't matched: a bare `-----BEGIN PRIVATE
+  KEY-----` (a common `openssl genpkey` output) or `-----BEGIN ENCRYPTED
+  PRIVATE KEY-----` passed through completely undetected. Added both as
+  a second pattern alternative, with unit tests and a new benchmark
+  fixture (`benchmark/corpus/positives/private_key_pkcs8.pem`). Updated
+  the README's detector list to mention PKCS#8. Benchmark precision
+  improved 94.74% → 95.00%.
+- `github_token` only matched the five classic token prefixes
+  (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`) — GitHub's fine-grained personal
+  access tokens (`github_pat_` prefix) weren't matched at all. Added
+  `github_pat_\w{82}` as a second alternative; the exact length/charset
+  was verified against gitleaks' public detection config (GitHub's own
+  docs confirm the prefix but not the length). New benchmark fixture
+  (`benchmark/corpus/positives/github_fine_grained_pat.py`) and two unit
+  tests (`test_github_token_fine_grained_pat_positive`,
+  `_negative_wrong_length`). Benchmark precision improved slightly
+  (94.44% → 94.74%) since the new true positive outweighs the unchanged
+  false positive count.
+- `aws_access_key_id` matched 8 AWS unique-ID prefixes but only 2 (`AKIA`,
+  `ASIA`) are actual credentials — the other 6 (`AGPA`/`AIDA`/`AIPA`/
+  `ANPA`/`ANVA`/`AROA`, verified against AWS's own IAM unique-identifier
+  reference) are AWS's internal resource-identifier prefixes (user group,
+  IAM user, instance profile, managed policy, policy version, role), not
+  secrets. Narrowed the pattern to `AKIA`/`ASIA` only. No benchmark
+  regression (the corpus only ever used `AKIA`-prefixed fixtures).
+
 ### Added
 - `CONTRIBUTING.md` — new "Testing philosophy" section after the existing
   "Adding a new detector" checklist, explaining the five real test
@@ -50,8 +92,9 @@ added in the same PR as the change it describes.
   doesn't match GitHub's `github_pat_`-prefixed fine-grained personal
   access tokens at all, only the five classic `gh[pousr]_` formats.
   `private_key_block` similarly doesn't match PKCS#8's algorithm-prefix-
-  free `-----BEGIN PRIVATE KEY-----` header. None of these are bugs to
-  fix in this pass — they're real, now-documented coverage facts.
+  free header. None of these were fixed in this pass (docs-only scope) —
+  see the `Fixed` entries above from the follow-up pass that closed all
+  three.
 - `docs/FAQ.md` — genuinely new synthesis, not restated from
   `Limitations.md`/the ADRs: why this tool detects secrets and PII
   together rather than as two separate tools (grounded in `detectors.py`

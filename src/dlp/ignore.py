@@ -3,8 +3,10 @@
 Two layers:
   1. `.dlpignore` file (gitignore-style glob patterns, one per line) found at
      the root of the scanned tree, skipping entire files/directories.
-  2. Inline `# dlp-ignore` (or `// dlp-ignore`) trailing comment on a line,
-     suppressing findings on that specific line.
+  2. Inline `# dlp-ignore`, `// dlp-ignore`, or `<!-- dlp-ignore -->` trailing
+     comment on a line, suppressing findings on that specific line - three
+     comment styles so every common file type (code, C-family, Markdown/HTML)
+     has a native-looking option.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import re
 from pathlib import Path
 
 DLPIGNORE_FILENAME = ".dlpignore"
-_INLINE_IGNORE_RE = re.compile(r"(?:#|//)\s*dlp-ignore\b")
+_INLINE_IGNORE_RE = re.compile(r"(?:#|//|<!--)\s*dlp-ignore\b")
 
 
 def load_dlpignore(root: Path) -> list[str]:

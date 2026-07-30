@@ -80,7 +80,7 @@ recall drops below 85% (`benchmark/run_benchmark.py --min-precision --min-recall
 - GitHub / GitLab tokens
 - Slack tokens
 - JWTs
-- RSA / EC / OpenSSH / DSA / PGP private key blocks
+- RSA / EC / OpenSSH / DSA / PGP / PKCS#8 (encrypted and unencrypted) private key blocks
 - Generic `password=` / `pwd:` assignments <!-- dlp-ignore -->
 - Email addresses
 - US Social Security Numbers (with basic validity checks on the area/group/serial)
@@ -92,7 +92,8 @@ recall drops below 85% (`benchmark/run_benchmark.py --min-precision --min-recall
 
 Two mechanisms, same as `.gitignore` muscle memory:
 
-- **Inline:** add a trailing `# dlp-ignore` (or `// dlp-ignore`) comment on the line.
+- **Inline:** add a trailing `# dlp-ignore`, `// dlp-ignore`, or (for Markdown/HTML,
+  which has neither native comment style) `<!-- dlp-ignore -->` on the line.
 - **File/path-level:** add glob patterns to a `.dlpignore` file at the root of the
   scanned tree, e.g.:
 

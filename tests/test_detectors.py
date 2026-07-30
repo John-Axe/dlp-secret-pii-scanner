@@ -18,6 +18,14 @@ def test_aws_access_key_id_negative():
     assert not _fires("aws_access_key_id", "this is just AKIA in prose, not a real key")
 
 
+def test_aws_access_key_id_negative_resource_id_prefixes():
+    # AGPA/AIDA/AIPA/ANPA/ANVA/AROA are AWS's own unique-ID prefixes for
+    # non-secret resources (user group/IAM user/instance profile/managed
+    # policy/policy version/role) - not credentials, and not this rule's job.
+    for prefix in ("AGPA", "AIDA", "AIPA", "ANPA", "ANVA", "AROA"):
+        assert not _fires("aws_access_key_id", f"UserId: {prefix}IOSFODNN7EXAMPLE")
+
+
 def test_aws_secret_key_positive():
     assert _fires(
         "aws_secret_key",
@@ -204,9 +212,27 @@ def test_github_token_ghr_prefix():
     assert _fires("github_token", 'token = "ghr_00000000000000000000000000000000000A"')
 
 
+def test_github_token_fine_grained_pat_positive():
+    token = "github_pat_" + "0" * 81 + "A"  # github_pat_ + 82 chars, per gitleaks' pattern
+    assert _fires("github_token", f'token = "{token}"')
+
+
+def test_github_token_fine_grained_pat_negative_wrong_length():
+    token = "github_pat_" + "0" * 80 + "A"  # one char short of 82
+    assert not _fires("github_token", f'token = "{token}"')
+
+
 def test_shannon_entropy_empty_string():
     assert detectors.shannon_entropy("") == 0.0
 
 
 def test_private_key_block_public_key_negative():
     assert not _fires("private_key_block", "-----BEGIN RSA PUBLIC KEY-----")
+
+
+def test_private_key_block_pkcs8_unencrypted_positive():
+    assert _fires("private_key_block", "-----BEGIN PRIVATE KEY-----")
+
+
+def test_private_key_block_pkcs8_encrypted_positive():
+    assert _fires("private_key_block", "-----BEGIN ENCRYPTED PRIVATE KEY-----")
