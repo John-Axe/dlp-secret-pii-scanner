@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 BENCHMARK_DIR = Path(__file__).resolve().parent
@@ -43,6 +43,7 @@ def evaluate() -> dict:
     corpus_dir = BENCHMARK_DIR / "corpus"
 
     per_rule = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0})
+    match_counts: Counter[str] = Counter()
     false_positive_details: list[tuple[str, str]] = []
     false_negative_details: list[tuple[str, str]] = []
 
@@ -51,6 +52,11 @@ def evaluate() -> dict:
         expected = set(labels.get(rel, []))
         findings = scan_file(file_path, display_path=rel)
         actual = {f.rule_id for f in findings}
+        # Raw match count, not deduplicated by file - a purely additive,
+        # non-gating diagnostic (see render_table). Distinct from per_rule's
+        # tp/fp/fn, which grade "did this rule fire on this file at all,"
+        # not "how many times."
+        match_counts.update(f.rule_id for f in findings)
 
         for rule_id in expected & actual:
             per_rule[rule_id]["tp"] += 1
@@ -63,6 +69,7 @@ def evaluate() -> dict:
 
     return {
         "per_rule": dict(per_rule),
+        "match_counts": dict(match_counts),
         "false_positives": false_positive_details,
         "false_negatives": false_negative_details,
     }
@@ -75,9 +82,12 @@ def precision_recall_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]
     return precision, recall, f1
 
 
-def render_table(results: dict) -> tuple[str, float, float, float]:
+def render_table(results: dict) -> tuple[str, float, float, float, int, int, int]:
     per_rule = results["per_rule"]
-    headers = ["RULE", "TP", "FP", "FN", "PRECISION", "RECALL", "F1"]
+    # N = tp + fn = how many corpus files actually expect this rule to fire -
+    # the sample size behind each row's precision/recall, so "1.00" next to
+    # N=1 reads honestly as a single-example result, not an inflated claim.
+    headers = ["RULE", "N", "TP", "FP", "FN", "PRECISION", "RECALL", "F1"]
     rows = []
     total_tp = total_fp = total_fn = 0
     for rule_id in sorted(per_rule):
@@ -87,12 +97,24 @@ def render_table(results: dict) -> tuple[str, float, float, float]:
         total_fp += fp
         total_fn += fn
         precision, recall, f1 = precision_recall_f1(tp, fp, fn)
-        rows.append([rule_id, str(tp), str(fp), str(fn), f"{precision:.2f}", f"{recall:.2f}", f"{f1:.2f}"])
+        rows.append(
+            [
+                rule_id,
+                str(tp + fn),
+                str(tp),
+                str(fp),
+                str(fn),
+                f"{precision:.2f}",
+                f"{recall:.2f}",
+                f"{f1:.2f}",
+            ]
+        )
 
     overall_p, overall_r, overall_f1 = precision_recall_f1(total_tp, total_fp, total_fn)
     rows.append(
         [
             "OVERALL",
+            str(total_tp + total_fn),
             str(total_tp),
             str(total_fp),
             str(total_fn),
@@ -117,7 +139,17 @@ def render_table(results: dict) -> tuple[str, float, float, float]:
         lines.append("\nFalse negatives (missed detections):")
         lines.extend(f"  {file} -> {rule_id}" for file, rule_id in results["false_negatives"])
 
-    return "\n".join(lines), overall_p, overall_r, overall_f1
+    match_counts = results["match_counts"]
+    if match_counts:
+        lines.append(
+            "\nMatch-level diagnostics (informational only, does not affect "
+            "PASS/FAIL - see docs/Benchmark-Methodology.md):"
+        )
+        lines.append("  Raw finding count per rule across the whole corpus:")
+        for rule_id in sorted(match_counts):
+            lines.append(f"    {rule_id}: {match_counts[rule_id]}")
+
+    return "\n".join(lines), overall_p, overall_r, overall_f1, total_tp, total_fp, total_fn
 
 
 def badge_color(precision: float) -> str:
@@ -168,9 +200,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     results = evaluate()
-    table, precision, recall, f1 = render_table(results)
+    table, precision, recall, f1, total_tp, total_fp, total_fn = render_table(results)
     print(table)
-    print(f"\nOverall precision={precision:.2%} recall={recall:.2%} f1={f1:.2%}")
+    print(
+        f"\nOverall precision={precision:.2%} ({total_tp}/{total_tp + total_fp}) "
+        f"recall={recall:.2%} ({total_tp}/{total_tp + total_fn}) f1={f1:.2%}"
+    )
 
     if args.badge_output:
         write_badge(args.badge_output, precision, recall, f1)

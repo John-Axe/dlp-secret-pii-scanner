@@ -11,7 +11,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "benchmark"))
 
-from run_benchmark import badge_color, evaluate, precision_recall_f1, write_badge  # noqa: E402
+from run_benchmark import (  # noqa: E402
+    badge_color,
+    evaluate,
+    precision_recall_f1,
+    render_table,
+    write_badge,
+)
 
 
 def test_precision_recall_f1_perfect():
@@ -59,6 +65,44 @@ def test_badge_color_thresholds():
     assert badge_color(0.9) == "brightgreen"
     assert badge_color(0.8) == "yellow"
     assert badge_color(0.5) == "red"
+
+
+def _fake_results(**overrides):
+    base = {
+        "per_rule": {"aws_access_key_id": {"tp": 1, "fp": 0, "fn": 1}},
+        "match_counts": {"aws_access_key_id": 3},
+        "false_positives": [],
+        "false_negatives": [("positives/missed.txt", "aws_access_key_id")],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_render_table_includes_sample_size_column():
+    table, *_ = render_table(_fake_results())
+    header_line = table.splitlines()[0]
+    assert "N" in header_line.split()
+    # aws_access_key_id: tp=1, fn=1 -> sample size (N) is 2, not just tp=1.
+    rule_line = next(line for line in table.splitlines() if line.startswith("aws_access_key_id"))
+    assert rule_line.split()[1] == "2"
+
+
+def test_render_table_returns_totals_matching_per_rule_sums():
+    _, precision, recall, f1, total_tp, total_fp, total_fn = render_table(_fake_results())
+    assert (total_tp, total_fp, total_fn) == (1, 0, 1)
+    assert precision == 1.0
+    assert recall == 0.5
+
+
+def test_render_table_includes_match_level_diagnostics_section():
+    table, *_ = render_table(_fake_results())
+    assert "Match-level diagnostics" in table
+    assert "aws_access_key_id: 3" in table
+
+
+def test_render_table_omits_diagnostics_section_when_no_matches():
+    table, *_ = render_table(_fake_results(match_counts={}))
+    assert "Match-level diagnostics" not in table
 
 
 def test_write_badge_produces_shields_io_endpoint_schema(tmp_path):

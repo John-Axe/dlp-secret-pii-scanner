@@ -12,6 +12,18 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `benchmark/run_benchmark.py`: a new **N** (sample size = TP+FN) column
+  in the per-rule table, so `1.00` next to `N=1` reads honestly as a
+  single-example result rather than an inflated claim; a new, clearly
+  separate **"Match-level diagnostics"** section reporting raw finding
+  counts per rule across the whole corpus (informational only, does not
+  affect PASS/FAIL — the existing per-`(file, rule)` grading contract is
+  unchanged); and `(x/y)` notation on the overall precision/recall
+  summary line (`95.00% (34/35)` instead of a bare percentage).
+  `evaluate()`'s `match_counts` and `render_table()`'s new return values
+  are purely additive — no existing caller's contract changed. New
+  direct unit tests for `render_table()` (previously the only
+  benchmark-script function with zero direct test coverage).
 - Nine new benchmark positive fixtures. A second example, in a genuinely
   different format/context, for every rule that previously had exactly
   one (`aws_secret_key_terraform.tfvars`, `credit_card_inline_prose.txt`,
