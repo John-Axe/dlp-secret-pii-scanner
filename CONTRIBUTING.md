@@ -97,6 +97,12 @@ Anything touching `github_pr.py`, the CI `permissions:` blocks, or dependency
 pinning gets extra scrutiny — see [`SECURITY.md`](SECURITY.md) for how to report an
 actual vulnerability privately rather than in a public PR/issue.
 
+## Changelog
+
+Add an entry to [`CHANGELOG.md`](CHANGELOG.md) under `[Unreleased]` in the same PR
+as the change — not as a follow-up. Use the existing `Added`/`Changed`/`Fixed`/
+`Security` grouping from [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
 ## What a good PR looks like here
 
 One logical change per PR. A new detector, a CLI flag, and a docs fix are three PRs,
