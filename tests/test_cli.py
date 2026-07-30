@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
+import pytest
+
+from dlp import __version__
 from dlp.cli import main
 
 
@@ -147,6 +152,41 @@ def test_cli_table_format(tmp_path: Path, capsys):
 
     assert "SEVERITY" in out
     assert "aws_access_key_id" in out
+
+
+def test_cli_version_flag_prints_version_and_exits_zero(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--version"])
+
+    assert exc_info.value.code == 0
+    assert __version__ in capsys.readouterr().out
+
+
+def test_cli_help_epilog_lists_examples_and_exit_codes(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+
+    assert exc_info.value.code == 0
+    out = capsys.readouterr().out
+    assert "examples:" in out
+    assert "exit codes:" in out
+
+
+def test_python_dash_m_dlp_runs_as_a_module(tmp_path: Path):
+    """`python -m dlp` is a real alternative entry point, not just an
+    importable-but-unused __main__.py — invoked via subprocess, not mocked,
+    the same way this project's other "does the real thing work" claims
+    (the benchmark, the self-scan) are verified rather than asserted."""
+    (tmp_path / "creds.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "dlp", str(tmp_path), "--fail-on", "high"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "aws_access_key_id" in result.stdout
 
 
 def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
