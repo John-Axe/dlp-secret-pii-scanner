@@ -12,6 +12,19 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Architecture.md` — a component diagram of the actual module
+  dependency graph (extracted with `grep` from real `from .` imports, not
+  inferred from module names — confirms no circular imports), a sequence
+  diagram of the real `pr-scan.yml` CI flow, and a deployment diagram of
+  the three ways this tool runs (CLI, pre-commit, GitHub Action). Doesn't
+  reproduce the README's existing scan-pipeline diagram (one diagram to
+  keep current, not two copies to drift apart) but does document the
+  release pipeline (SLSA/Sigstore/PyPI Trusted Publisher), which wasn't
+  written down anywhere before this — including the caveat that the PyPI
+  publish step is `continue-on-error: true` pending PyPI-side Trusted
+  Publisher configuration, not a confirmed-working claim (an earlier draft
+  of this file linked to a README section that doesn't actually discuss
+  releases at all — caught and corrected before committing, not after).
 - `docs/Threat-Model.md` — what this tool trusts (scanned-file bytes, never
   executed; the local git binary for `--diff-only`; `GITHUB_TOKEN` for
   exactly one purpose) versus what it doesn't (file content as adversarial
