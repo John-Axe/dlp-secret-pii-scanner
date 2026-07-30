@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -140,6 +141,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also write findings.jsonl (shared ecosystem finding schema) to this path, "
         "for observability-stack's Promtail to tail. Overwritten each run.",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Scan files in parallel using this many worker processes (0 = all "
+        "available CPUs). Default: 1 (sequential) - not config-file-eligible, "
+        "since this is a per-run/per-machine tradeoff, not a team standard. "
+        "Output is identical to sequential for the same input; only wall-clock "
+        "time differs. Mainly worth it for a full-repo scan, not a small "
+        "--diff-only PR check where process-pool startup cost dominates.",
+    )
     return parser
 
 
@@ -167,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"dlp-scan: {exc}", file=sys.stderr)
         return 1
     settings = _resolve_settings(args, cfg)
+    jobs = (os.cpu_count() or 1) if args.jobs <= 0 else args.jobs
 
     stats = ScanStats()
 
@@ -179,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
                 entropy_threshold=settings["entropy_threshold"],
                 ignore_root=Path.cwd(),
                 stats=stats,
+                jobs=jobs,
             )
             if changed
             else []
@@ -189,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
             enable_entropy=not settings["no_entropy"],
             entropy_threshold=settings["entropy_threshold"],
             stats=stats,
+            jobs=jobs,
         )
 
     if stats.total_skipped:

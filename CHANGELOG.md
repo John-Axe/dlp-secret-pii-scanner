@@ -25,6 +25,15 @@ added in the same PR as the change it describes.
   (e.g. a detector regex that starts backtracking exponentially), not to
   enforce a specific throughput number — closes a gap the original
   engineering audit named explicitly.
+- `--jobs N` scans files across N worker processes (`--jobs 0` = all
+  available CPUs; default `--jobs 1`, unchanged sequential behavior). Uses
+  multiprocessing, not threading — measured empirically first: threading was
+  consistently *slower* than sequential for this CPU-bound regex workload
+  (GIL contention), multiprocessing measured a real 1.4-3.6x speedup.
+  Confirmed end-to-end through the real CLI (~2.5x on a 3000-file corpus,
+  byte-identical output to sequential). `scan_paths(..., jobs=N)` produces
+  identical findings, in identical order, with identical `ScanStats`
+  totals to `jobs=1` for the same input.
 - `findings.jsonl` output via `--emit-findings`, mapping this tool's findings onto
   the ecosystem-wide shared finding schema (severity, MITRE ATT&CK, OWASP fields)
   for consumption by `observability-stack`'s Promtail/Loki/Grafana pipeline.

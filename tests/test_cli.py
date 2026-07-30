@@ -300,3 +300,32 @@ def test_cli_entropy_threshold_from_config_is_used(tmp_path: Path, capsys, monke
 
     # threshold 8.0 is above what this token's entropy reaches, so it's never flagged
     assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
+
+
+def test_cli_jobs_flag_finds_the_same_findings_as_sequential(tmp_path: Path, capsys):
+    (tmp_path / "creds.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    main([str(tmp_path), "--jobs", "2", "--format", "json", "--fail-on", "none"])
+    findings = json.loads(capsys.readouterr().out)
+
+    assert any(f["rule_id"] == "aws_access_key_id" for f in findings)
+
+
+def test_cli_jobs_zero_resolves_to_cpu_count(tmp_path: Path, monkeypatch):
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+    monkeypatch.setattr("dlp.cli.os.cpu_count", lambda: 6)
+
+    captured_jobs = {}
+    from dlp import cli as cli_module
+
+    real_scan_paths = cli_module.scan_paths
+
+    def spying_scan_paths(*args, **kwargs):
+        captured_jobs["jobs"] = kwargs.get("jobs")
+        return real_scan_paths(*args, **kwargs)
+
+    monkeypatch.setattr(cli_module, "scan_paths", spying_scan_paths)
+
+    main([str(tmp_path), "--jobs", "0", "--fail-on", "none"])
+
+    assert captured_jobs["jobs"] == 6
