@@ -1,0 +1,3 @@
+# PLANTED FAKE TOKEN for benchmark testing only (Windows CRLF line endings)
+GITHUB_TOKEN=ghp_00000000000000000000000000000000000A
+DEPLOY_ENV=production

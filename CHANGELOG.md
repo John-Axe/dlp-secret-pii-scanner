@@ -12,6 +12,27 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- Nine new benchmark positive fixtures. A second example, in a genuinely
+  different format/context, for every rule that previously had exactly
+  one (`aws_secret_key_terraform.tfvars`, `credit_card_inline_prose.txt`,
+  `gitlab_ci_secret.yml`, `jwt_in_api_response.json`,
+  `slack_webhook_config.json`, `pii_ssn_form_dump.txt`) so a "100%" isn't
+  resting on a sample size of one. Plus three fixtures for edge cases
+  with previously zero corpus coverage: `unicode_secret_context.py` (a
+  real secret surrounded by Japanese/Cyrillic/emoji text, confirming
+  unicode doesn't break detection), `multi_secret_deployment_script.py`
+  (6 different rules firing on one realistic ~80-line file, a
+  materially stronger multi-secret case than the existing 3-rule
+  `leaked_env_combo.env`), and `crlf_line_endings.txt` (actual `\r\n`
+  Windows line endings). Every fixture verified with a direct `dlp-scan`
+  run before its `labels.json` entry was written — one produced a real
+  surprise worth noting: `jwt_in_api_response.json`'s fabricated
+  payload/signature segments are themselves high-entropy, so it
+  legitimately triggers `high_entropy_string` too, matching the
+  existing `jwt_token.txt` precedent rather than being an unexpected
+  false positive. Every rule now has ≥2 true positives (was as low as
+  1 for six rules). Benchmark precision improved 95.00% → 97.14% (34 TP,
+  same single known FP, no new ones introduced).
 - Four new benchmark negative fixtures, each a specific false-positive
   trap not previously in the corpus: `token_prefix_mentions.md` (docs
   mentioning AWS/GitHub/GitLab/Slack token prefixes without a real
