@@ -19,6 +19,12 @@ added in the same PR as the change it describes.
   and the existing suppression conventions, previously undocumented outside the
   maintainer's own head.
 - This `CHANGELOG.md`.
+- `--version` flag and `python -m dlp` as an alternative entry point alongside the
+  `dlp-scan` console script.
+- Worked examples and exit-code documentation in `dlp-scan --help`'s epilog,
+  previously only in the README.
+- Three structured issue forms (false positive, new detector request, bug report),
+  a PR template mirroring the CONTRIBUTING.md pre-PR checklist, and `CODEOWNERS`.
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).
