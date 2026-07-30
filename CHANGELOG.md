@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/adr/0003-regex-entropy-over-ml-classifier.md` — retroactive ADR for
+  why detection stays regex + Shannon entropy rather than a trained
+  classifier. Weighs a classifier option narrowly scoped to replace just
+  the entropy detector (the source of this project's one benchmark false
+  positive) against the same detector's determinism/explainability
+  guarantees, the zero-runtime-dependency decision in ADR 0002, and the
+  benchmark corpus's actual size (20 files — nowhere near enough to train
+  a generalizable model).
 - `docs/adr/0002-zero-runtime-dependencies.md` — retroactive ADR for
   `dependencies = []`, present unchanged since the project's first commit
   (`f99d4ae`). Names the concrete stdlib substitutes already in place
