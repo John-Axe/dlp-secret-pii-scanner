@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dlp import severity
-from dlp.ignore import is_path_ignored, load_dlpignore
+from dlp.ignore import has_inline_ignore, is_path_ignored, load_dlpignore
 from dlp.scanner import ScanStats, scan_file, scan_paths
 
 
@@ -230,6 +230,32 @@ def test_has_inline_ignore_requires_comment_marker(tmp_path):
     lines = {f.line for f in findings if f.rule_id == "aws_access_key_id"}
     assert 1 in lines
     assert 2 not in lines
+
+
+def test_has_inline_ignore_hash_style():
+    assert has_inline_ignore("real_key = 'x'  # dlp-ignore")
+
+
+def test_has_inline_ignore_double_slash_style():
+    assert has_inline_ignore("realKey = 'x';  // dlp-ignore")
+
+
+def test_has_inline_ignore_html_comment_style():
+    # Markdown/HTML files have no native "#"/"//" comment syntax - an HTML
+    # comment renders invisibly, the natural suppression style for them.
+    assert has_inline_ignore("- some markdown bullet <!-- dlp-ignore -->")
+
+
+def test_has_inline_ignore_html_comment_style_in_scan(tmp_path):
+    target = tmp_path / "notes.md"
+    target.write_text(
+        "Fake key: AKIAIOSFODNN7EXAMPLE <!-- dlp-ignore -->\n"
+        "Real key: AKIAIOSFODNN7EXAMPLE\n"
+    )
+    findings = scan_file(target)
+    lines = {f.line for f in findings if f.rule_id == "aws_access_key_id"}
+    assert 1 not in lines
+    assert 2 in lines
 
 
 def test_is_path_ignored_windows_backslash():

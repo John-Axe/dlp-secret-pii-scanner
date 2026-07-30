@@ -12,6 +12,19 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Fixed
+- Inline suppression (`ignore._INLINE_IGNORE_RE`) required a literal `#`
+  or `//` before `dlp-ignore` — the `<!-- dlp-ignore -->` HTML-comment
+  style README.md already documented (and used on its own `## Detectors`
+  list) never actually worked, since an HTML comment has neither marker.
+  This had never mattered before because the one existing example
+  (`generic_password`) is `medium` severity, always under `--fail-on
+  critical` regardless of whether the suppression comment functioned.
+  Widened the regex to accept `<!--` as a third valid marker — a real
+  behavior change for every user of this tool, not a docs-only fix. As a
+  direct consequence, README.md's own `## Detectors` list line, which
+  was always intended to demonstrate this, now genuinely suppresses
+  itself (previously it silently didn't, and it never showed up because
+  nothing checked below `critical`).
 - `private_key_block` only matched algorithm-prefixed PEM headers (RSA,
   EC, OpenSSH, DSA, PGP) — PKCS#8 (RFC 5958) headers, which carry no
   algorithm name at all, weren't matched: a bare `-----BEGIN PRIVATE
