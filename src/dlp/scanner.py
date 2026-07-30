@@ -14,6 +14,32 @@ DEFAULT_ENTROPY_THRESHOLD = 4.3
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 
+@dataclasses.dataclass
+class ScanStats:
+    """Mutable counters describing what a scan actually looked at.
+
+    Passed in and incremented in place by scan_file/scan_paths, rather than
+    returned alongside findings, so a caller that only wants findings (most
+    existing call sites, and most tests) doesn't have to change how it calls
+    either function. A caller that wants visibility into what was silently
+    skipped - which was previously genuinely silent, see CHANGELOG - passes
+    one in and reads it after the call.
+    """
+
+    files_scanned: int = 0
+    files_skipped_too_large: int = 0
+    files_skipped_binary: int = 0
+    files_skipped_unreadable: int = 0
+
+    @property
+    def total_skipped(self) -> int:
+        return (
+            self.files_skipped_too_large
+            + self.files_skipped_binary
+            + self.files_skipped_unreadable
+        )
+
+
 @dataclasses.dataclass(frozen=True)
 class Finding:
     file: str
@@ -70,19 +96,31 @@ def scan_file(
     display_path: str | None = None,
     enable_entropy: bool = True,
     entropy_threshold: float = DEFAULT_ENTROPY_THRESHOLD,
+    stats: ScanStats | None = None,
 ) -> list[Finding]:
     display = display_path if display_path is not None else str(path)
     try:
         with path.open("rb") as fh:
             header = fh.read(8192)
-            if not header or _is_probably_binary(header):
+            if not header:
+                return []
+            if _is_probably_binary(header):
+                if stats is not None:
+                    stats.files_skipped_binary += 1
                 return []
             rest = fh.read(MAX_FILE_SIZE_BYTES)
         data = header + rest
     except OSError:
+        if stats is not None:
+            stats.files_skipped_unreadable += 1
         return []
     if len(data) > MAX_FILE_SIZE_BYTES:
+        if stats is not None:
+            stats.files_skipped_too_large += 1
         return []
+
+    if stats is not None:
+        stats.files_scanned += 1
 
     text = data.decode("utf-8", errors="ignore")
     findings: list[Finding] = []
@@ -128,6 +166,7 @@ def scan_paths(
     enable_entropy: bool = True,
     entropy_threshold: float = DEFAULT_ENTROPY_THRESHOLD,
     ignore_root: Path | None = None,
+    stats: ScanStats | None = None,
 ) -> list[Finding]:
     """Scans files and/or directories.
 
@@ -138,6 +177,10 @@ def scan_paths(
     look for a `.dlpignore` next to itself, so a repo-root `.dlpignore`
     would never apply. Defaults to each path's own directory (or parent,
     for a single file), preserving the original single-root behavior.
+
+    `stats`, if given, is mutated in place with counts of files scanned and
+    files skipped (too large / binary / unreadable) - pass one in to make an
+    otherwise-silent skip visible instead of losing it.
     """
     findings: list[Finding] = []
     resolved_ignore_root = ignore_root.resolve() if ignore_root is not None else None
@@ -161,6 +204,7 @@ def scan_paths(
                     display_path=display,
                     enable_entropy=enable_entropy,
                     entropy_threshold=entropy_threshold,
+                    stats=stats,
                 )
             )
     return findings

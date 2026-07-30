@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, baseline, diff, report, severity
-from .scanner import DEFAULT_ENTROPY_THRESHOLD, scan_paths
+from .scanner import DEFAULT_ENTROPY_THRESHOLD, ScanStats, scan_paths
 from .shared_finding import write_shared_findings_jsonl
 
 EPILOG = """\
@@ -107,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    stats = ScanStats()
 
     if args.diff_only:
         changed = diff.changed_files(args.base_ref, Path.cwd())
@@ -116,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
                 enable_entropy=not args.no_entropy,
                 entropy_threshold=args.entropy_threshold,
                 ignore_root=Path.cwd(),
+                stats=stats,
             )
             if changed
             else []
@@ -125,6 +127,25 @@ def main(argv: list[str] | None = None) -> int:
             [Path(p) for p in args.paths],
             enable_entropy=not args.no_entropy,
             entropy_threshold=args.entropy_threshold,
+            stats=stats,
+        )
+
+    if stats.total_skipped:
+        # stderr, deliberately, and only when something was actually skipped:
+        # --format json/sarif's stdout is a machine-readable contract that
+        # can't carry an extra line, and a summary on every ordinary run
+        # (the common case, zero skips) would just be noise CI logs don't
+        # need. This is specifically about making a *skip* visible, not
+        # general scan telemetry - see the engineering audit for why a
+        # silent skip (a >5MB file, an unreadable file) matters for a tool
+        # whose job is finding things that shouldn't be missed.
+        print(
+            f"dlp-scan: {stats.total_skipped} file(s) skipped and NOT scanned "
+            f"({stats.files_skipped_too_large} too large, "
+            f"{stats.files_skipped_binary} binary, "
+            f"{stats.files_skipped_unreadable} unreadable) "
+            f"-- {stats.files_scanned} file(s) scanned successfully",
+            file=sys.stderr,
         )
 
     if args.write_baseline:

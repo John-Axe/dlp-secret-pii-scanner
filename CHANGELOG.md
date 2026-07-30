@@ -34,6 +34,15 @@ added in the same PR as the change it describes.
   `coverage json` report the same way `benchmark/run_benchmark.py` already
   generates the precision/recall badge — CI regenerates and commits both on every
   push to `main` if they changed.
+- `dlp-scan` now reports skipped files on stderr (count and reason: too large /
+  binary / unreadable) whenever at least one file was skipped, instead of
+  silently producing the same empty result a clean scan would.
+
+### Fixed
+- Two silent-failure paths in `scan_file` — a file over 5MB and a file that
+  raised `OSError` on read (permission denied, or removed mid-scan) — both
+  previously returned `[]` indistinguishably from "scanned, no findings."
+  Both are now counted and surfaced (see Added, above).
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).
