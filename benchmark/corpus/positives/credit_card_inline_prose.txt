@@ -1,0 +1,5 @@
+Support ticket transcript (PLANTED FAKE PII for benchmark testing only -
+well-known test card number).
+
+Customer said they'd already tried paying with 5500005555555559 twice and
+both attempts failed at checkout before they contacted support.

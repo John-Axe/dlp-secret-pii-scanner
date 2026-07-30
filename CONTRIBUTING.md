@@ -109,6 +109,16 @@ unit test and stop:
   this list would notice — a unit test only checks correctness on inputs you thought
   to try, not wall-clock behavior on ones you didn't.
 
+One test doesn't fit any of the five categories above, on purpose: `tests/
+test_benchmark.py::test_committed_badge_matches_fresh_run` isn't testing detection
+logic at all — it's testing that a *committed artifact* (`.github/badges/
+benchmark.json`) hasn't drifted from the corpus that's supposed to have generated it.
+This repo hit exactly that drift for real (see `CHANGELOG.md`'s `[Unreleased]` `Fixed`
+entries): the badge only auto-regenerates on a `main`-branch push, so a run of local
+corpus-changing commits left it stale with nothing catching it. A generated-artifact
+consistency check is a different kind of test than "does this detector work" — it
+exists to keep documented claims honest, not to catch a detection regression.
+
 Coverage (the 90% floor in step 3 above) is a byproduct of writing tests that map to
 these real categories, not the goal itself — see the "Before opening a PR" section's
 note on what earns a test its place.

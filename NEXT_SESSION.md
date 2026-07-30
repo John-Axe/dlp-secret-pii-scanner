@@ -1,6 +1,6 @@
-# Handoff — engineering transformation, Phase 7 complete
+# Handoff — engineering transformation, Phase 8 complete
 
-**Last updated:** 2026-07-30, Phase 7 complete.
+**Last updated:** 2026-07-30, Phase 8 complete.
 **Read this file first** if you're picking this work up cold — it should let
 you continue without re-deriving anything below.
 
@@ -8,130 +8,157 @@ you continue without re-deriving anything below.
 
 `dlp-secret-pii-scanner` went through a structured engineering-quality
 pass: audit → 5-phase roadmap → incremental, individually-verified PRs, each
-with its own Goal/Reasoning/Tradeoffs writeup in its commit message. Two
-more phases were added mid-pass (see "How Phases 6 and 7 came about" below).
-Nothing has been pushed to `origin` or merged — everything lives on seven
-stacked local branches, one commit per coherent change, matching how this
-repo already holds PR merges for an explicit human go-ahead. `docs/Roadmap.md`
+with its own Goal/Reasoning/Tradeoffs writeup in its commit message. Three
+more phases were added mid-pass (see "How Phases 6-8 came about" below).
+Nothing has been pushed to `origin` or merged — everything lives on eight
+stacked local branches, one commit per coherent change. `docs/Roadmap.md`
 has the phase-by-phase breakdown for Phases 1-5 with commit references (not
-yet updated for Phases 6-7 — a reasonable next edit if continuing); this
+yet updated for Phases 6-8 — a reasonable next edit if continuing); this
 file stays focused on handoff state.
 
 ## Completed work
 
-### Phase 1 — Quick wins (`engineering-audit/phase-1-quick-wins`, 5 commits)
-### Phase 2 — Engineering improvements (`engineering-audit/phase-2-engineering-improvements`, 6 commits)
-### Phase 3 — Architecture improvements (`engineering-audit/phase-3-architecture-improvements`, 6 commits)
-### Phase 4 — Production-readiness docs (`engineering-audit/phase-4-production-docs`, 7 commits)
-### Phase 5 — Retroactive design records (`engineering-audit/phase-5-retroactive-docs`, 5 commits)
+### Phases 1-5 (see [`docs/Roadmap.md`](docs/Roadmap.md) for the full commit-by-commit breakdown)
 
-See [`docs/Roadmap.md`](docs/Roadmap.md) for what Phases 1-5 actually
-contain, tabulated by commit hash. Short version: CI gates, bug fixes,
-`--jobs`/logging, four ADRs (`docs/adr/0001`-`0004`), six production-
-readiness docs (`Limitations`/`Threat-Model`/`Architecture`/`Operations`/
-`Performance`/`Troubleshooting`), plus `Roadmap.md`/`FAQ.md`.
+CI gates, five real code bugs found and fixed, `--jobs`/logging, four ADRs
+(`docs/adr/0001`-`0004`), six production-readiness docs, `Roadmap.md`/`FAQ.md`.
 
 ### Phase 6 — Deepen engineering documentation (`engineering-audit/phase-6-detector-and-methodology-docs`, 3 commits)
-1. `9fe04fc` — [`docs/Detectors.md`](docs/Detectors.md) — per-detector
-   reference for all 11 rules
-2. `9f4c85d` — [`docs/Benchmark-Methodology.md`](docs/Benchmark-Methodology.md)
-   — the grading mechanics behind the README's benchmark numbers
-3. `049943a` — `CONTRIBUTING.md`'s new "Testing philosophy" section, plus
-   a fix for a stale `docs/Design-Decisions.md` forward-reference left
-   over from before Phase 5 decided not to write that file
 
-Writing `Detectors.md` surfaced three real, previously-undocumented
-detector gaps, verified against vendor docs (fetched live, not recalled
-from memory): `aws_access_key_id` over-matched 6 non-credential AWS
-resource-ID prefixes, `github_token` missed GitHub's fine-grained
-`github_pat_` tokens entirely, and `private_key_block` missed PKCS#8's
-algorithm-prefix-free header. Phase 6 itself stayed docs-only (that was
-the agreed scope) — Phase 7 is what actually fixed them.
+`docs/Detectors.md` (per-detector reference), `docs/Benchmark-Methodology.md`
+(v1), `CONTRIBUTING.md` Testing philosophy section. Writing `Detectors.md`
+surfaced three real detector coverage gaps, verified against vendor docs.
 
-### Phase 7 — Detector coverage fixes (`engineering-audit/phase-7-detector-coverage-fixes`, 5 commits) — **COMPLETE**
-1. `f50f73d` — narrowed `aws_access_key_id` to `AKIA`/`ASIA` only (the two
-   real credential prefixes; the other six were AWS resource IDs)
-2. `8097e03` — `github_token` now matches `github_pat_` fine-grained PATs
-   (format verified against gitleaks' public config: `github_pat_\w{82}`)
-3. `a027c50` — `private_key_block` now matches PKCS#8's
-   algorithm-prefix-free headers, both unencrypted and encrypted
-4. `b089098` — `NEXT_SESSION.md` handoff for the three detector fixes
-5. `d519e33` — `ignore._INLINE_IGNORE_RE` widened to accept `<!-- -->`
-   HTML-comment style, not just `#`/`//` (see below)
+### Phase 7 — Detector coverage fixes (`engineering-audit/phase-7-detector-coverage-fixes`, 6 commits)
 
-Each detector fix followed `CONTRIBUTING.md`'s full "Adding a new
-detector" checklist even though these weren't new rules —
-new/updated benchmark fixture, `labels.json` entry, unit tests
-(including a negative test for the `aws_access_key_id` fix, confirming
-the removed prefixes no longer match), `docs/Detectors.md` updated to
-describe the fix instead of the gap, and a full gate + benchmark
-re-run confirming no precision/recall regression before each commit.
-Benchmark precision actually *improved* across the three fixes:
-94.44% → 94.74% → 95.00% (each new true positive, zero new false
-positives).
+Fixed all three gaps Phase 6 found (`aws_access_key_id` narrowed to real
+credential prefixes, `github_token` gained `github_pat_` support,
+`private_key_block` gained PKCS#8 support — precision climbed 94.44% →
+95.00% across the three, zero regressions). Also found and fixed, on
+explicit human confirmation, a real unrelated bug: `README.md`'s
+documented `<!-- dlp-ignore -->` HTML-comment suppression style never
+actually worked (`ignore._INLINE_IGNORE_RE` required a literal `#`/`//`);
+widened the regex, confirmed working end-to-end.
 
-**A real, unrelated bug found while chasing the `private_key_block`
-fix's self-scan gate — found, asked about explicitly, and fixed**:
-widening `private_key_block` made it match its own literal description
-in this repo's docs/changelog (the same "scanner flags its own
-documentation" situation the README already names for
-`generic_password`). Suppressing it surfaced that `README.md`'s
-documented `<!-- dlp-ignore -->` HTML-comment suppression style (used
-on its own `## Detectors` list line, and shown in the architecture
-flowchart) **did not actually work** — `ignore._INLINE_IGNORE_RE` was
-`(?:#|//)\s*dlp-ignore\b`, requiring a literal `#` or `//` immediately
-before `dlp-ignore`; an HTML comment has neither. This had never
-mattered before because `generic_password` is `medium` severity,
-always under every self-scan's `--fail-on critical` gate regardless of
-whether the suppression comment actually functioned. Presented as an
-explicit choice (widen the regex vs. fix the README's example vs.
-leave it) rather than decided unilaterally; the human chose widening
-the regex. Fixed in `d519e33`: `_INLINE_IGNORE_RE` now also accepts
-`<!--`, with direct unit tests for all three marker styles plus an
-integration test via `scan_file`. Confirmed working, not just
-asserted: README.md's own `## Detectors` list line — which was always
-intended to demonstrate this — now genuinely suppresses itself;
-self-scan's finding count dropped from 7 to 6 as a direct, verified
-consequence.
+### Phase 8 — Benchmark, testing methodology, and evidence hardening (`engineering-audit/phase-8-benchmark-hardening`, 7 commits) — **COMPLETE**
 
-**How Phases 6 and 7 came about**: a mid-session message asked for a
-platform-scale rebuild (Docker, REST API, plugin architecture, ML
-roadmap item, IDE extension, full README/CI rewrite) that directly
-contradicted committed ADRs. Flagged rather than acted on. A follow-up
-exchange clarified the actual intent: not a platform pivot — deepen
-engineering quality *within* the existing narrow scope, preserving every
-ADR. That became Phase 6 (docs) after a full re-read of the repo found
-three genuine documentation gaps and several explicitly-declined
-non-gaps. Phase 7 followed directly from a one-word "fix" — the three
-detector gaps Phase 6 had found and documented but deliberately not
-touched.
+1. `83007bb` — 4 new negative fixtures (false-positive traps: token-prefix
+   mentions, boundary-length near-misses, PKCS#8 public key, JSON env
+   placeholders)
+2. `8db1b27` — 9 new positive fixtures (2nd example for every rule that had
+   exactly one, plus unicode/multi-secret/CRLF edge cases)
+3. `8abbf1c` — sample-size (**N**) column + match-level diagnostics section
+   in `run_benchmark.py`, purely additive, existing pass/fail contract
+   unchanged
+4. `60f56a9` — peak RSS measurement in `run_throughput_benchmark.py`
+   (stdlib `resource`, POSIX-only, degrades gracefully on Windows)
+5. `29dbedf` — **fixed real stale-data drift found while auditing**:
+   `.github/badges/benchmark.json` and `README.md`'s table still said 94%
+   precision / 17 TP from before Phase 7, because nothing regenerates the
+   badge except a `main`-branch push that's never happened. Regenerated
+   both; added `test_committed_badge_matches_fresh_run` so `pytest` catches
+   this specific drift on every run going forward
+6. `811a17a` — strengthened `docs/Benchmark-Methodology.md` (plain-English
+   primer, fixture-category breakdown, Reproducibility section, Threats to
+   validity section) and, while doing so, **found the same stale number
+   repeated in three more places** (README's intro line, `Detectors.md`,
+   two spots in `FAQ.md` — one of which had overclaimed that drift was
+   structurally impossible, which had just been proven false); fixed all,
+   replaced hardcoded numbers with pointers to the authoritative source
+   where possible so they can't drift silently again
+7. `595ab7a` — documented the badge-drift test as a distinct testing
+   category in `CONTRIBUTING.md` (it checks artifact staleness, not
+   detector correctness — doesn't fit the existing five categories)
 
-**Net across all seven phases:** 130 → 224 tests (+9 in Phase 7; Phases
-5-6 were pure documentation, no code touched), coverage steady at
-~97.4-97.5%, five real code bugs found and fixed in Phases 1-3, three
-real documentation inaccuracies caught and fixed before committing in
-Phase 4, one real previously-undocumented behavior surfaced in Phase 5,
-three real vendor-doc-verified detector coverage gaps found in Phase 6
-and fixed in Phase 7 (benchmark precision improved with each fix, no
-regression), one real unrelated bug (the `<!-- dlp-ignore -->` mechanism)
-found, explicitly asked about, and fixed in Phase 7. Every commit
-gate-checked (ruff, mypy, pytest+coverage, benchmark, self-scan) before
-committing, no exceptions.
+**Final state**: every corpus rule now has ≥2 true positives (was as low
+as 1 for six rules). Benchmark: 97.14% precision, 100% recall, 34 TP / 1 FP
+(same single known FP as always — the entropy detector's binary-asset
+case), 0 FN. 35 corpus files (23 positive, 12 negative), 229 tests, 97.46%
+coverage. Every commit gate-checked (ruff, mypy, pytest+coverage,
+benchmark, self-scan) before committing; every new fixture verified with a
+direct `dlp-scan` run before its `labels.json` entry was written, not
+assumed.
+
+**How Phases 6-8 came about**: a mid-session message asked for a
+platform-scale rebuild (Docker, REST API, plugin architecture, ML, IDE
+extension) that contradicted committed ADRs — flagged, not acted on. A
+follow-up exchange clarified the actual intent (deepen quality, don't
+expand scope), producing Phase 6. Phase 7 followed from a one-word "fix"
+of Phase 6's findings. Phase 8 followed from a further request to
+strengthen the benchmark/testing methodology specifically, with an
+explicit first principle (no scope change, preserve every ADR) — planned
+against a real audit of `run_benchmark.py`, the corpus, and
+`Benchmark-Methodology.md` before any file was touched, which is what
+surfaced the badge/README staleness that became items 5-6 above.
+
+## Final review (Phase 8's Step 15 — improvements, limitations, threats to validity, philosophy-consistent future ideas)
+
+**Improvements made**: corpus grew from 20 to 35 files with every new
+fixture serving a named, specific purpose (no padding for count); every
+rule has a real sample size ≥2 now, and that sample size is visible
+directly in the table instead of implied; a genuinely new diagnostic
+(match-level counts) exists without touching the existing grading
+contract; peak memory is now measured, not just throughput; a real,
+concrete data-staleness bug was found and fixed, and — more
+durably — a regression test now exists specifically to catch it recurring;
+the methodology doc gained a plain-English primer, an explicit
+threats-to-validity section, and a reproducibility section; and five
+separate stale-number copies scattered across the repo were found and
+fixed, with several converted to pointers rather than hardcoded figures
+so they're structurally harder to let drift again.
+
+**Remaining benchmark limitations** (named directly, not hedged):
+35 files is still small — most rules are graded on 2-4 examples, real
+statistical evidence but not strong evidence. The corpus is entirely
+author-written; no independently-sourced or third-party-contributed
+fixtures exist. There's no adversarial/evasion corpus — every fixture
+tests realistic accidental leaks, not secrets deliberately obfuscated to
+dodge this tool's specific patterns. Full match-level (planted vs.
+detected vs. missed) grading was considered and deliberately not built —
+the annotation-maintenance cost was judged higher than the value on top
+of what file-level grading already catches; this is a real, revisitable
+judgment call, not a technical impossibility.
+
+**Remaining testing limitations**: the new
+`test_committed_badge_matches_fresh_run` only checks the badge JSON
+against a fresh run — it does **not** check `README.md`'s prose (the
+intro line, the table, or any other doc that quotes a specific number).
+Those were fixed by hand this phase but nothing stops them drifting again
+after a future corpus change; a stronger version of this check (e.g.
+asserting the README table's numbers parse-match a fresh run) is a real,
+bounded future improvement, not implemented here because it would mean
+parsing markdown tables out of prose — more fragile than it sounds for
+the value added in one pass.
+
+**Threats to validity**: see `docs/Benchmark-Methodology.md`'s own
+"Threats to validity" section (construct validity, selection bias, small
+per-rule N, no adversarial corpus) — written to be read directly, not
+duplicated here.
+
+**Future ideas that stay within this project's philosophy** (not
+committed to, not scheduled): growing the corpus further, especially
+third-party-contributed fixtures if this ever gets outside contributors
+(would reduce the selection-bias limitation named above); a lightweight
+historical trend log for the benchmark badge (each CI run's number
+appended somewhere queryable, not just the current-state badge) to catch
+slow drift a point-in-time number can't; extending the drift-detection
+pattern from the badge to README's prose numbers specifically. None of
+these require touching any ADR or expanding what kind of product this is.
 
 ## Current state (for orientation, not re-derivation)
 
 ```
 src/dlp/          11 modules, no circular imports (see docs/Architecture.md)
 docs/
-  adr/0001-no-plugin-system-yet.md
-  adr/0002-zero-runtime-dependencies.md
-  adr/0003-regex-entropy-over-ml-classifier.md
-  adr/0004-finding-fingerprint-design.md
-  Limitations.md, Threat-Model.md, Architecture.md,
-  Operations.md, Performance.md, Troubleshooting.md,
-  Roadmap.md, FAQ.md, Detectors.md, Benchmark-Methodology.md
-benchmark/        run_benchmark.py (CI-gated) + run_throughput_benchmark.py (not)
-tests/            224 tests, ~97.4% coverage, 90% CI floor
+  adr/0001-no-plugin-system-yet.md .. 0004-finding-fingerprint-design.md
+  Limitations.md, Threat-Model.md, Architecture.md, Operations.md,
+  Performance.md, Troubleshooting.md, Roadmap.md, FAQ.md, Detectors.md,
+  Benchmark-Methodology.md
+benchmark/
+  corpus/  35 files (23 positive, 12 negative)
+  run_benchmark.py (CI-gated, now with N column + match diagnostics)
+  run_throughput_benchmark.py (not CI-gated, now with peak-RSS)
+tests/            229 tests, 97.46% coverage, 90% CI floor
 ```
 
 Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
@@ -142,29 +169,31 @@ Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
 - Same short list as before, unchanged since Phase 4: `scanner.py:90,121,
   192-201`, `github_pr.py:231-232`, `cli.py:306` — pre-existing or
   process-boundary coverage gaps, none tied to a real bug.
-- CI itself has not been run (nothing pushed). Watch the `--jobs`
-  `ProcessPoolExecutor` path especially closely on first push.
-- `v0.1.0` is still the only tag — everything in Phases 1-7 is
+- CI itself has not been run (nothing pushed).
+- `v0.1.0` is still the only tag — everything in Phases 1-8 is
   `[Unreleased]`.
 - `Finding.fingerprint`'s short-secret collision case — see
   [ADR 0004](docs/adr/0004-finding-fingerprint-design.md)'s Consequences.
-  Not a bug, a documented precision limit.
+- **New**: the badge-drift test only covers `.github/badges/benchmark.json`,
+  not README's prose numbers — see "Remaining testing limitations" above.
 
 ## Open questions for the human
 
-- **Push Phases 1-7 now for real CI validation?** Still real, working
-  precision-improving fixes with full gate coverage since Phase 3 — the
-  case for pushing sooner rather than later hasn't gotten weaker.
+- **Push Phases 1-8 now for real CI validation?** The case hasn't gotten
+  weaker — everything is gated, benchmark-verified, and this phase in
+  particular found and fixed a real bug (badge/README drift) that only
+  exists *because* nothing's been pushed yet, which is its own argument
+  for pushing sooner.
 - **Is `[tool.dlp]` config support something you want dog-fooded in this
   repo's own `pyproject.toml`**, or "built and tested, not self-adopted"
-  long-term? Still open, unrelated to the rest of this work.
-- **The platform-scale rebuild request from two phases ago** — still
-  declined by default per every relevant ADR; only worth revisiting on a
-  deliberate decision to reopen one of them.
+  long-term? Still open.
+- **Extend the drift-detection pattern to README's prose numbers?** Named
+  as a real, bounded future improvement above — not started.
+- **The platform-scale rebuild request from three phases ago** — still
+  declined by default per every relevant ADR.
 
 ## Potential risks if continuing unattended
 
-- None — everything through Phase 7 has been gated and benchmark-verified
-  with no regressions, including the inline-ignore behavior change
-  (`d519e33`), which was explicitly proposed as a choice and confirmed by
-  the human before being implemented, not decided unilaterally.
+- None — everything through Phase 8 has been gated and benchmark-verified
+  with no regressions, and follows the same evidence-over-claims standard
+  it asked the benchmark itself to meet.

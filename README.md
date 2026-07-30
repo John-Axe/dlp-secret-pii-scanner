@@ -6,7 +6,7 @@
 [![Benchmark](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/benchmark.json)](benchmark/run_benchmark.py)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/coverage.json)](CONTRIBUTING.md)
 
-**94% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
+**97% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
 PII at commit time (pre-commit hook), at PR review time (inline comments + diff-only
 checks), and at merge time (GitHub Action / Security tab), with the accuracy claim
 backed by a benchmark you can re-run yourself, not a marketing number. The benchmark
@@ -48,24 +48,28 @@ flowchart LR
 ## Benchmark results
 
 Run yourself with `python benchmark/run_benchmark.py`. Numbers below are from the
-shipped corpus in `benchmark/corpus/` (12 positive files, 8 negative files), graded
-per `(file, rule)` pair against `benchmark/labels.json`.
+shipped corpus in `benchmark/corpus/` (23 positive files, 12 negative files), graded
+per `(file, rule)` pair against `benchmark/labels.json` — see
+[`docs/Benchmark-Methodology.md`](docs/Benchmark-Methodology.md) for exactly how
+grading works, including what the numbers below do and don't mean. **N** is the
+sample size (TP+FN) behind each row — a `1.00` next to a small N is a real result
+from a small sample, not a stronger claim than that.
 
-| Rule                 | TP | FP | FN | Precision | Recall | F1   |
-|----------------------|----|----|----|-----------|--------|------|
-| aws_access_key_id    | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| aws_secret_key       | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| credit_card          | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| email                | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| generic_password     | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| github_token         | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| gitlab_token         | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| high_entropy_string  | 3  | 1  | 0  | 0.75      | 1.00   | 0.86 |
-| jwt                  | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| private_key_block    | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| slack_token          | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| us_ssn               | 1  | 0  | 0  | 1.00      | 1.00   | 1.00 |
-| **OVERALL**          | **17** | **1** | **0** | **0.94** | **1.00** | **0.97** |
+| Rule                 | N  | TP | FP | FN | Precision | Recall | F1   |
+|----------------------|----|----|----|----|-----------|--------|------|
+| aws_access_key_id    | 4  | 4  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| aws_secret_key       | 3  | 3  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| credit_card          | 2  | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| email                | 3  | 3  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| generic_password     | 3  | 3  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| github_token         | 4  | 4  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| gitlab_token         | 2  | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| high_entropy_string  | 4  | 4  | 1  | 0  | 0.80      | 1.00   | 0.89 |
+| jwt                  | 2  | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| private_key_block    | 2  | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| slack_token          | 3  | 3  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| us_ssn               | 2  | 2  | 0  | 0  | 1.00      | 1.00   | 1.00 |
+| **OVERALL**          | **34** | **34** | **1** | **0** | **0.97** | **1.00** | **0.99** |
 
 **Known limitation, shown honestly:** the entropy detector's one false positive is a
 base64-encoded binary asset (`negatives/embedded_icon_asset.py`) — compressed/binary

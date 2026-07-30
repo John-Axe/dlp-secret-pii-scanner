@@ -11,6 +11,104 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Added
+- `CONTRIBUTING.md`'s Testing philosophy section: a short note on
+  `test_committed_badge_matches_fresh_run`, which doesn't fit any of the
+  five existing test categories — it checks a *committed artifact*
+  hasn't drifted from its source, not detector correctness, a distinct
+  kind of test this repo now has a real, non-hypothetical example of.
+- `docs/Benchmark-Methodology.md`: a plain-English "What precision and
+  recall mean here" primer before the exact formulas, a fixture-category
+  breakdown of the corpus (straightforward/multi-rule/format-diversity/
+  edge-case positives, three sub-kinds of negatives), a "Match-level
+  diagnostics" section documenting the new N column and diagnostics
+  output (including why full planted/detected/missed match grading was
+  considered and not done — real ongoing annotation burden for a metric
+  file-level grading already substantially serves), a "Reproducibility"
+  section (Python/OS/deps/determinism/commit-SHA-citation), and a
+  "Threats to validity" section naming construct validity, selection
+  bias, small per-rule sample sizes, and the lack of an adversarial
+  corpus directly rather than leaving them implicit.
+
+### Fixed
+- Found while updating the methodology doc above: four more places
+  restated the same stale 94%/12-positive-file numbers found in the
+  badge/README fix below — `README.md`'s top-line intro claim,
+  `docs/Detectors.md`'s entropy-detector writeup, and two spots in
+  `docs/FAQ.md` (one of which had overclaimed "nothing in the pipeline
+  allows" the badge to drift — corrected to describe what actually
+  happened and the real current safeguard, the new drift-detection
+  test, rather than a guarantee that turned out not to hold). Hardcoded
+  numbers were replaced with pointers to the authoritative source
+  (`Benchmark-Methodology.md`/`README.md`'s table) where the specific
+  figure wasn't the point, so they can't drift the same way again.
+- `.github/badges/benchmark.json` and `README.md`'s benchmark table were
+  stale — both still showed 94% precision / 17 TP from before Phase 7's
+  detector fixes and this phase's corpus expansion, because the only
+  thing that regenerates the badge is CI's main-branch push job, which
+  has never run (nothing's been pushed yet), and `CONTRIBUTING.md`'s
+  "regenerate the badge when you touch the corpus" step had no automated
+  check behind it. Regenerated both to the real current numbers (97.14%
+  precision, 34 TP) and added `test_committed_badge_matches_fresh_run`
+  (`tests/test_benchmark.py`) so this specific drift is now caught by
+  `pytest` on every commit, not just eventually by a main-branch push.
+
+### Added
+- `benchmark/run_throughput_benchmark.py` now also reports peak process
+  RSS (`resource.getrusage`, stdlib, POSIX-only — degrades to "not
+  measured on this platform" rather than crashing on Windows, no new
+  dependency). Same "not a portable claim, run it yourself" framing as
+  the existing throughput numbers. `docs/Performance.md` gets a new
+  "Memory" section with a real measured number from this session
+  (~30MB peak RSS at 3000 files) and an explicit, labeled expectation
+  (not yet independently verified with a profiler) that peak RSS should
+  track `--jobs` concurrency more than total file count, given
+  `MAX_FILE_SIZE_BYTES` already bounds any single file's in-memory size.
+- `benchmark/run_benchmark.py`: a new **N** (sample size = TP+FN) column
+  in the per-rule table, so `1.00` next to `N=1` reads honestly as a
+  single-example result rather than an inflated claim; a new, clearly
+  separate **"Match-level diagnostics"** section reporting raw finding
+  counts per rule across the whole corpus (informational only, does not
+  affect PASS/FAIL — the existing per-`(file, rule)` grading contract is
+  unchanged); and `(x/y)` notation on the overall precision/recall
+  summary line (`95.00% (34/35)` instead of a bare percentage).
+  `evaluate()`'s `match_counts` and `render_table()`'s new return values
+  are purely additive — no existing caller's contract changed. New
+  direct unit tests for `render_table()` (previously the only
+  benchmark-script function with zero direct test coverage).
+- Nine new benchmark positive fixtures. A second example, in a genuinely
+  different format/context, for every rule that previously had exactly
+  one (`aws_secret_key_terraform.tfvars`, `credit_card_inline_prose.txt`,
+  `gitlab_ci_secret.yml`, `jwt_in_api_response.json`,
+  `slack_webhook_config.json`, `pii_ssn_form_dump.txt`) so a "100%" isn't
+  resting on a sample size of one. Plus three fixtures for edge cases
+  with previously zero corpus coverage: `unicode_secret_context.py` (a
+  real secret surrounded by Japanese/Cyrillic/emoji text, confirming
+  unicode doesn't break detection), `multi_secret_deployment_script.py`
+  (6 different rules firing on one realistic ~80-line file, a
+  materially stronger multi-secret case than the existing 3-rule
+  `leaked_env_combo.env`), and `crlf_line_endings.txt` (actual `\r\n`
+  Windows line endings). Every fixture verified with a direct `dlp-scan`
+  run before its `labels.json` entry was written — one produced a real
+  surprise worth noting: `jwt_in_api_response.json`'s fabricated
+  payload/signature segments are themselves high-entropy, so it
+  legitimately triggers `high_entropy_string` too, matching the
+  existing `jwt_token.txt` precedent rather than being an unexpected
+  false positive. Every rule now has ≥2 true positives (was as low as
+  1 for six rules). Benchmark precision improved 95.00% → 97.14% (34 TP,
+  same single known FP, no new ones introduced).
+- Four new benchmark negative fixtures, each a specific false-positive
+  trap not previously in the corpus: `token_prefix_mentions.md` (docs
+  mentioning AWS/GitHub/GitLab/Slack token prefixes without a real
+  token), `boundary_length_tokens.txt` (a GitHub-token-shaped string one
+  char short of 36, a lowercase AWS-key-shaped string, a JWT missing its
+  third segment), `pkcs8_public_key.pem` (PKCS#8 public key header, a
+  `private_key_block` near-miss), `config_with_env_placeholders.json`
+  (JSON-format `${VAR}` placeholders, complementing the existing
+  YAML/env versions). Each verified to produce zero findings before
+  adding its `labels.json` entry. No change to benchmark numbers (all
+  four are true negatives, as designed).
+
 ### Fixed
 - Inline suppression (`ignore._INLINE_IGNORE_RE`) required a literal `#`
   or `//` before `dlp-ignore` — the `<!-- dlp-ignore -->` HTML-comment

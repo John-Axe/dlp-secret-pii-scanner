@@ -1,0 +1,6 @@
+{
+  "_comment": "PLANTED FAKE TOKEN for benchmark testing only",
+  "token_type": "Bearer",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.PLANTEDFAKEPAYLOAD1234567890.PLANTEDFAKESIGNATURE1234567890ABCDEF",
+  "expires_in": 3600
+}
