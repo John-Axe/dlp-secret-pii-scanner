@@ -1,6 +1,6 @@
 # Handoff — engineering transformation, in progress
 
-**Last updated:** 2026-07-30, mid-Phase 3.
+**Last updated:** 2026-07-30, Phase 3 complete, Phase 4 not yet started.
 **Read this file first** if you're picking this work up cold — it should let
 you continue without re-deriving anything below.
 
@@ -16,43 +16,56 @@ already holds PR merges for an explicit human go-ahead.
 ## Completed work
 
 ### Phase 1 — Quick wins (branch `engineering-audit/phase-1-quick-wins`, 5 commits)
-1. `6552c88` — `CONTRIBUTING.md`
-2. `9a58a85` — `CHANGELOG.md`, backfilled from git history
-3. `7c6d026` — 3 tailored issue forms, PR template, `CODEOWNERS`
-4. `3435130` — `--version`, `python -m dlp`, worked `--help` examples
-5. `7d73713` — CHANGELOG catch-up for #3/#4
+`CONTRIBUTING.md`, `CHANGELOG.md`, issue/PR templates + `CODEOWNERS`,
+`--version`/`python -m dlp`/`--help` examples.
 
 ### Phase 2 — Engineering improvements (branch `engineering-audit/phase-2-engineering-improvements`, stacked on Phase 1, 6 commits)
-1. `9ec4343` — `ruff check` + `mypy src/` (strict) + 90% coverage floor, all as CI gates. `py.typed` added (PEP 561).
-2. `d6d9a3c` — Fixed two silent-failure paths (`scan_file`'s `except OSError` and >5MB skip both returned `[]`). Added `ScanStats`.
-3. `c9cd3c4` — `dlp.github_pr.post_review_comments` capped at 25 comments, rate-limit-aware with backoff.
-4. `f6d685c` — Hypothesis property tests for Luhn/SSN/entropy. Found and fixed a real self-inflicted bug: `.hypothesis` cache dir wasn't skipped.
-5. `14b62fd` — `pyproject.toml [tool.dlp]` per-project config support (stdlib `tomllib`, zero new runtime dep).
-6. `c720e48` — this file, first version.
+CI gates (ruff/mypy strict/90% coverage + `py.typed`), fixed two silent-skip
+bugs (`ScanStats`), bounded + rate-limit-hardened `github_pr.py`, Hypothesis
+property tests (+ fixed a self-inflicted `.hypothesis`-cache-dir bug),
+`pyproject.toml [tool.dlp]` config support.
 
-### Phase 3 — Architecture improvements (branch `engineering-audit/phase-3-architecture-improvements`, stacked on Phase 2, 2 commits so far)
-1. `c3626f9` — `docs/adr/0001-no-plugin-system-yet.md`. Grounded in real data (`git log --follow -- src/dlp/detectors.py`: all 11 detectors landed in the initial commit, zero new rules since — not the "once a quarter" guess this file previously stated).
-2. `99131bd` — `benchmark/run_throughput_benchmark.py` (not CI-gated — machine-dependent) + `tests/test_performance_smoke.py` (CI-gated, generous 10s ceiling, targets catastrophic ReDoS-style regressions specifically). **Baseline established this session, this machine: ~1050 files/sec, ~5.7 MB/sec, 2000 synthetic files / 11MB in 1.9s.** Also caught and fixed a real bug in the benchmark script itself (planted-secret interval was mathematically unreachable at the default file size — see commit message).
+### Phase 3 — Architecture improvements (branch `engineering-audit/phase-3-architecture-improvements`, stacked on Phase 2, 6 commits) — **COMPLETE**
+1. `c3626f9` — `docs/adr/0001-no-plugin-system-yet.md`, grounded in real git
+   history data.
+2. `99131bd` — `benchmark/run_throughput_benchmark.py` (not CI-gated) +
+   `tests/test_performance_smoke.py` (CI-gated, catches catastrophic ReDoS-
+   style regressions). Baseline: ~1050 files/sec sequential on this machine.
+3. `c66049b` — `--jobs N` parallel scanning. **Measured before implementing**:
+   a throwaway benchmark showed threading was *slower* than sequential
+   (0.75-0.86x, GIL contention) while multiprocessing gave a real 1.4-3.6x
+   speedup — this determined the implementation, overturning the original
+   audit's tentative "threads" guess. Confirmed end-to-end through the real
+   CLI: 2.985s → 1.171s (~2.5x) on a 3000-file corpus, byte-identical output.
+   Caught a real Python 3.14 `forkserver`-start-method gotcha while writing
+   the tests (monkeypatched globals don't propagate to worker processes) —
+   fixed by testing with real file conditions instead.
+4. `5f0a47e` — `-v`/`--verbose` and `-q`/`--quiet` logging. Named `dlp`
+   logger, never the root logger, handlers only configured in `main()` (the
+   CLI entry point) — `dlp`'s modules stay safely importable as a library.
 
-**Net so far:** 130 → 202 tests, coverage 96.45% → 97.98%, four real bugs
-fixed (three operational-trust bugs in Phase 2, one benchmark-script bug in
-Phase 3), zero regressions. Every commit individually verified against the
-full local gate sequence (ruff, mypy, pytest+coverage, benchmark, self-scan,
-10k-iteration fuzz) before landing.
+**Net so far:** 130 → 215 tests, coverage 96.45% → 97.46%, five real bugs
+found and fixed along the way (three Phase-2 operational-trust bugs, one
+Phase-3 benchmark-script bug, one Phase-3 test-design bug from the
+forkserver gotcha), zero regressions. Every commit individually verified
+against the full local gate sequence (ruff, mypy, pytest+coverage,
+benchmark, self-scan, 10k-iteration fuzz) before landing — several commits
+also verified with real end-to-end CLI runs beyond the test suite (the
+`--jobs` speedup measurement, manual `-v`/`-vv`/`-q` output checks).
 
 ## Current architecture (for orientation, not re-derivation)
 
 ```
 src/dlp/
-  cli.py            argparse entry point, thin orchestration only
+  cli.py            argparse entry point + logging config (LOGGER = "dlp")
   config.py         pyproject.toml [tool.dlp] loading/validation
-  scanner.py        file walk + Finding dataclass + ScanStats
+  scanner.py        file walk + Finding + ScanStats + parallel scan (jobs=N)
   detectors.py       11 regex detectors + Shannon-entropy detector
   report.py          table/json/sarif rendering
   baseline.py         fingerprint-based suppression
   diff.py             git diff --name-only wrapper for --diff-only
   ignore.py            .dlpignore + inline # dlp-ignore
-  github_pr.py        inline PR comments, rate-limit-aware
+  github_pr.py        inline PR comments, rate-limit-aware, still uses print()
   shared_finding.py    maps onto the ecosystem-wide finding schema
 scripts/coverage_badge.py
 benchmark/
@@ -61,92 +74,101 @@ benchmark/
 docs/adr/0001-no-plugin-system-yet.md
 ```
 
-Zero runtime dependencies is a load-bearing, deliberate constraint across the
-whole codebase — respect it. `tomllib` and everything test-only (`hypothesis`,
-`pytest-cov`, `ruff`, `mypy`) are dev-only, not runtime.
+Zero runtime dependencies is a load-bearing, deliberate constraint — respect
+it. `tomllib` and everything test-only (`hypothesis`, `pytest-cov`, `ruff`,
+`mypy`) are dev-only, not runtime.
 
 ## Known issues / gaps still open
 
-- **Pre-existing, low-priority, not tied to a real bug:** `scanner.py:89,120`,
-  `github_pr.py:231-232`. Skip unless doing a dedicated coverage pass.
-- CI itself has not been run (nothing pushed) — everything is verified
-  *locally* against the exact commands CI runs. Watch the first real push
-  closely for anything environment-specific that differs from this sandbox.
+- **Pre-existing, low-priority, not tied to a real bug:** `scanner.py:90,121`
+  (`ignore_root`-fallback path, empty-file early return), `scanner.py:192-201`
+  (`_scan_file_worker`'s body — only executes in a worker process, coverage.py
+  can't instrument it; functionally proven by the parallel-vs-sequential
+  equality tests instead), `github_pr.py:231-232`, `cli.py:306`
+  (`--emit-findings`'s write call). None security- or correctness-relevant.
+- `github_pr.py` still uses `print()` for its own operational messages
+  (not converted to the new `LOGGER` — deliberately out of scope for the
+  logging commit, noted as a reasonable follow-up, not urgent).
+- CI itself has not been run (nothing pushed) — everything verified
+  *locally*. Watch the first real push closely, especially the `--jobs`
+  ProcessPoolExecutor path — CI runners may have fewer/different CPU
+  characteristics or a different default multiprocessing start method than
+  this sandbox's Python 3.14 (`forkserver`).
 - This repo's own `pyproject.toml` deliberately has no `[tool.dlp]` section
   (see commit `14b62fd`'s message for why).
 
-## Recommended next task: Phase 3, item 2 — `--jobs` parallel scanning
+## Recommended next task: Phase 4 — production-readiness docs
 
-**This is the one that needs real attention, not a quick continuation.**
-Unlike everything shipped so far in Phases 2-3 (additive: new modules, new
-tests, new CLI flags that default to old behavior), this touches
-`scan_paths`' actual hot path.
+Phase 3 is done. Phase 4 is pure documentation (no code risk), covering:
+`docs/Architecture.md`, `docs/Threat-Model.md`, `docs/Operations.md`,
+`docs/Troubleshooting.md`, `docs/Performance.md`, `docs/Limitations.md`.
 
-**Before writing code, measure first, don't assume:** the original audit
-guessed threads would help (I/O-bound file reads) but flagged the GIL as a
-limit on the regex/CPU side. Now that `run_throughput_benchmark.py` exists,
-actually build a `ThreadPoolExecutor` version and a `ProcessPoolExecutor`
-version and benchmark both against the same synthetic corpus before
-committing to one — don't guess when a 5-minute measurement answers it.
+**Suggested order and why:**
 
-**The one correctness property that must not break:** findings currently
-come back in a stable, deterministic order (files walked via `sorted(root.
-rglob("*"))`, one file at a time). A naive `executor.map()` over that same
-file list preserves order (concurrent.futures' `map` yields results in
-submission order, not completion order — verify this is actually being
-relied on correctly, don't assume). A parallel `--jobs` mode must produce
-byte-identical output to the sequential path for the same input, or:
-- `run_benchmark.py`'s `(file, rule_id)` pairing breaks
-- Any test asserting finding order breaks
-- `--write-baseline`'s fingerprint set is unaffected (it's a set, order-
-  independent) but worth confirming explicitly rather than assuming
+1. **`docs/Limitations.md` first** — the highest-leverage one to write, and
+   the most already-known: this session's work has already surfaced several
+   honest limitations worth collecting in one place rather than scattered
+   across commit messages and ADR 0001: no way to add an org-private secret
+   format without forking (ADR 0001), `--jobs` startup cost not worth it for
+   small scans, the entropy detector's known false-positive class (binary/
+   compressed data), detectors can't catch a secret split across multiple
+   files or encoded beyond simple entropy detection. Fast to write since the
+   content already exists, just not consolidated.
+2. **`docs/Threat-Model.md`** — trust boundaries are already mostly *lived*
+   in this codebase (redaction, GITHUB_TOKEN scoping, SHA-pinned Actions)
+   but never written down as a single document. Should state explicitly:
+   what's trusted input (the source tree being scanned), what's an
+   untrusted output sink (PR comment bodies — already backtick-escaped
+   against Markdown injection, worth citing as evidence of real threat
+   modeling, not just claiming it), and what's out of scope (network
+   attacks, supply-chain compromise of a dependency — though there are
+   none at runtime).
+3. **`docs/Architecture.md`** — largely already written, in the README's
+   embedded Mermaid diagram and its surrounding prose. This is mostly
+   *extraction and expansion*, not new content: pull it out, add a
+   component diagram (the 10 `src/dlp/` modules and their actual import
+   relationships — genuinely simple, verify with a quick import-graph check
+   rather than assuming) and a sequence diagram for one real flow (a
+   `pull_request` CI run: checkout → diff-only scan → baseline filter →
+   SARIF upload + inline comments).
+4. **`docs/Operations.md`** — how to actually run this in production: the
+   pre-commit hook, the GitHub Action, the `pr-scan.yml`/`ci.yml` workflows,
+   what `--jobs` is worth turning on for, upgrade path (bump the pinned
+   `rev:`/tag).
+5. **`docs/Performance.md`** — mostly already exists in README's new
+   "Parallel scanning" section + the throughput benchmark's own docstring;
+   promote/expand into its own doc with the actual measured numbers from
+   this session (baseline ~1050 files/sec sequential, ~2.5x at `--jobs 0`
+   on a 24-core machine) framed honestly as *this machine's* numbers, not a
+   portable claim.
 
-**Suggested test to write first, before the implementation:** scan the same
-directory tree sequentially and with `--jobs N` for several values of N,
-assert the findings lists are identical (not just same-length — actually
-equal, in order). This is the test that proves the feature is safe to ship;
-write it before or alongside the implementation, not after.
+**Estimated effort:** 4-6 hours total across all six files. **Risk: none**
+(pure documentation, no code changes).
 
-**Design sketch, not gospel — reconsider after measuring:**
-- `scan_paths(..., jobs: int = 1)` — default 1 (today's exact sequential
-  behavior, zero risk to existing callers/tests).
-- CLI: `--jobs N` (or `--jobs auto` → `os.cpu_count()`).
-- Whichever executor wins the benchmark, wrap file-level `scan_file` calls
-  in it; keep the file *list* built exactly as today (same walk, same
-  order), only parallelize the per-file scan work, then reassemble results
-  in original file-list order regardless of completion order.
+## Phase 5 (after Phase 4)
 
-**Estimated effort:** 3-4 hours including the measure-first step and the
-order-preservation test. **Risk: medium** — real behavior change, but fully
-contained by defaulting to `jobs=1` (unchanged behavior unless a user opts
-in) and the order-equality test.
-
-## Suggested implementation order after that
-
-Phase 3 remainder:
-3. Structured `logging` adoption + `--verbose`/`--quiet` (~2hrs) — natural
-   follow-on to the `ScanStats`/stderr work already done in Phase 2.
-
-Phase 4 (docs: `Architecture.md`, `Threat-Model.md`, `Operations.md`,
-`Troubleshooting.md`, `Performance.md`, `Limitations.md`) and Phase 5
-(`Design-Decisions.md`, `FAQ.md`, `Roadmap.md`, `Development-Log.md`,
-`Case-Study.md`, retroactive ADRs for zero-deps and regex-vs-ML) are still
-fully open — see the original audit's roadmap for full effort/ROI estimates
-per item (not yet its own committed file — worth promoting out of chat
-history into `docs/Roadmap.md` when Phase 4 starts).
+`docs/Design-Decisions.md`, `docs/FAQ.md`, `docs/Roadmap.md`,
+`docs/Development-Log.md`, `docs/Case-Study.md`, retroactive ADRs (0002:
+zero-runtime-dependencies; 0003: regex+entropy over an ML/statistical
+classifier; 0004: the fingerprint design — see `Finding.fingerprint`'s
+existing docstring, which already contains the reasoning, just not in ADR
+form yet). See the original audit's roadmap for full effort/ROI estimates.
 
 ## Open questions for the human
 
-- Push Phases 1-3 now for real CI validation, or keep accumulating locally?
-  Recommend pushing once `--jobs` lands, since that's the first change in
-  this whole pass with real behavioral risk.
+- Push Phases 1-3 now for real CI validation, or keep accumulating locally
+  through Phase 4 (docs-only, so lower urgency than after Phase 3's
+  `--jobs` change)?
 - Is `[tool.dlp]` config support something you actually want dog-fooded in
-  this repo's own `pyproject.toml`, or is "built and tested, not
-  self-adopted" the right call long-term?
+  this repo's own `pyproject.toml`, or "built and tested, not
+  self-adopted" long-term?
 
 ## Potential risks if continuing unattended
 
-- `--jobs` is the one item flagged above needing real scrutiny — don't rush
-  it into a commit without the order-preservation test passing.
-- Everything else remaining (structured logging, all of Phase 4/5 docs) is
-  additive/documentation-only — lower supervision needed than `--jobs`.
+- None of Phase 4 touches code — lowest-supervision phase so far. The one
+  thing worth double-checking per doc: don't let `Architecture.md`/
+  `Performance.md` drift into re-describing what the README already covers
+  well; extract and cross-link rather than duplicate, per the original
+  audit's Documentation finding (the README is already doing five jobs;
+  Phase 4 exists to relieve it, not add a sixth thing that also needs
+  updating every time something changes).
