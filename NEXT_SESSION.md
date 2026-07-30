@@ -48,43 +48,51 @@ resource-ID prefixes, `github_token` missed GitHub's fine-grained
 algorithm-prefix-free header. Phase 6 itself stayed docs-only (that was
 the agreed scope) — Phase 7 is what actually fixed them.
 
-### Phase 7 — Detector coverage fixes (`engineering-audit/phase-7-detector-coverage-fixes`, 3 commits) — **COMPLETE**
+### Phase 7 — Detector coverage fixes (`engineering-audit/phase-7-detector-coverage-fixes`, 5 commits) — **COMPLETE**
 1. `f50f73d` — narrowed `aws_access_key_id` to `AKIA`/`ASIA` only (the two
    real credential prefixes; the other six were AWS resource IDs)
 2. `8097e03` — `github_token` now matches `github_pat_` fine-grained PATs
    (format verified against gitleaks' public config: `github_pat_\w{82}`)
-3. *(this commit)* — `private_key_block` now matches PKCS#8's
+3. `a027c50` — `private_key_block` now matches PKCS#8's
    algorithm-prefix-free headers, both unencrypted and encrypted
+4. `b089098` — `NEXT_SESSION.md` handoff for the three detector fixes
+5. `d519e33` — `ignore._INLINE_IGNORE_RE` widened to accept `<!-- -->`
+   HTML-comment style, not just `#`/`//` (see below)
 
-Each fix followed `CONTRIBUTING.md`'s full "Adding a new detector"
-checklist even though these weren't new rules — new/updated benchmark
-fixture, `labels.json` entry, unit tests (including a negative test for
-the aws_access_key_id fix, confirming the removed prefixes no longer
-match), `docs/Detectors.md` updated to describe the fix instead of the
-gap, and a full gate + benchmark re-run confirming no precision/recall
-regression before each commit. Benchmark precision actually *improved*
-across the three fixes: 94.44% → 94.74% → 95.00% (each new true positive,
-zero new false positives).
+Each detector fix followed `CONTRIBUTING.md`'s full "Adding a new
+detector" checklist even though these weren't new rules —
+new/updated benchmark fixture, `labels.json` entry, unit tests
+(including a negative test for the `aws_access_key_id` fix, confirming
+the removed prefixes no longer match), `docs/Detectors.md` updated to
+describe the fix instead of the gap, and a full gate + benchmark
+re-run confirming no precision/recall regression before each commit.
+Benchmark precision actually *improved* across the three fixes:
+94.44% → 94.74% → 95.00% (each new true positive, zero new false
+positives).
 
-**A real, unrelated bug found while chasing this phase's self-scan
-gate, flagged but not fixed**: widening `private_key_block` made it match
-its own literal description in this repo's docs/changelog (the same
-"scanner flags its own documentation" situation the README already
-names for `generic_password`). Suppressing it surfaced that
-`README.md`'s documented `<!-- dlp-ignore -->` HTML-comment suppression
-style (used on its own `## Detectors` list line 84, and shown in the
-architecture diagram) **does not actually work** —
-`ignore._INLINE_IGNORE_RE` is `(?:#|//)\s*dlp-ignore\b`, which requires a
-literal `#` or `//` immediately before `dlp-ignore`; an HTML comment has
-neither. This has never mattered before because `generic_password` is
-`medium` severity, always under every self-scan's `--fail-on critical`
-gate regardless of whether the suppression comment actually functions.
-Worked around here with `<!-- # dlp-ignore -->` (satisfies the regex,
-still renders invisibly) rather than fixing `ignore.py`'s regex itself,
-since that's a distinct bug outside this phase's scope — **not fixed,
-real, and worth a deliberate look**: either widen the regex to accept
-HTML-comment style, or fix `README.md`'s example to use working syntax
-(and fix the flowchart caption too).
+**A real, unrelated bug found while chasing the `private_key_block`
+fix's self-scan gate — found, asked about explicitly, and fixed**:
+widening `private_key_block` made it match its own literal description
+in this repo's docs/changelog (the same "scanner flags its own
+documentation" situation the README already names for
+`generic_password`). Suppressing it surfaced that `README.md`'s
+documented `<!-- dlp-ignore -->` HTML-comment suppression style (used
+on its own `## Detectors` list line, and shown in the architecture
+flowchart) **did not actually work** — `ignore._INLINE_IGNORE_RE` was
+`(?:#|//)\s*dlp-ignore\b`, requiring a literal `#` or `//` immediately
+before `dlp-ignore`; an HTML comment has neither. This had never
+mattered before because `generic_password` is `medium` severity,
+always under every self-scan's `--fail-on critical` gate regardless of
+whether the suppression comment actually functioned. Presented as an
+explicit choice (widen the regex vs. fix the README's example vs.
+leave it) rather than decided unilaterally; the human chose widening
+the regex. Fixed in `d519e33`: `_INLINE_IGNORE_RE` now also accepts
+`<!--`, with direct unit tests for all three marker styles plus an
+integration test via `scan_file`. Confirmed working, not just
+asserted: README.md's own `## Detectors` list line — which was always
+intended to demonstrate this — now genuinely suppresses itself;
+self-scan's finding count dropped from 7 to 6 as a direct, verified
+consequence.
 
 **How Phases 6 and 7 came about**: a mid-session message asked for a
 platform-scale rebuild (Docker, REST API, plugin architecture, ML
@@ -98,16 +106,17 @@ non-gaps. Phase 7 followed directly from a one-word "fix" — the three
 detector gaps Phase 6 had found and documented but deliberately not
 touched.
 
-**Net across all seven phases:** 130 → 220 tests (+5 in Phase 7; Phases
+**Net across all seven phases:** 130 → 224 tests (+9 in Phase 7; Phases
 5-6 were pure documentation, no code touched), coverage steady at
 ~97.4-97.5%, five real code bugs found and fixed in Phases 1-3, three
 real documentation inaccuracies caught and fixed before committing in
 Phase 4, one real previously-undocumented behavior surfaced in Phase 5,
 three real vendor-doc-verified detector coverage gaps found in Phase 6
 and fixed in Phase 7 (benchmark precision improved with each fix, no
-regression), one real unrelated bug found and flagged (not fixed) in
-Phase 7. Every commit gate-checked (ruff, mypy, pytest+coverage,
-benchmark, self-scan) before committing, no exceptions.
+regression), one real unrelated bug (the `<!-- dlp-ignore -->` mechanism)
+found, explicitly asked about, and fixed in Phase 7. Every commit
+gate-checked (ruff, mypy, pytest+coverage, benchmark, self-scan) before
+committing, no exceptions.
 
 ## Current state (for orientation, not re-derivation)
 
@@ -122,7 +131,7 @@ docs/
   Operations.md, Performance.md, Troubleshooting.md,
   Roadmap.md, FAQ.md, Detectors.md, Benchmark-Methodology.md
 benchmark/        run_benchmark.py (CI-gated) + run_throughput_benchmark.py (not)
-tests/            220 tests, ~97.4% coverage, 90% CI floor
+tests/            224 tests, ~97.4% coverage, 90% CI floor
 ```
 
 Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
@@ -140,11 +149,6 @@ Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
 - `Finding.fingerprint`'s short-secret collision case — see
   [ADR 0004](docs/adr/0004-finding-fingerprint-design.md)'s Consequences.
   Not a bug, a documented precision limit.
-- **New**: `README.md`'s `<!-- dlp-ignore -->` inline-suppression example
-  (line 84, plus the architecture flowchart's mention) doesn't actually
-  work — `ignore._INLINE_IGNORE_RE` requires a literal `#`/`//`, which an
-  HTML comment doesn't have. See "A real, unrelated bug" above. Not fixed
-  this phase.
 
 ## Open questions for the human
 
@@ -154,14 +158,6 @@ Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
 - **Is `[tool.dlp]` config support something you want dog-fooded in this
   repo's own `pyproject.toml`**, or "built and tested, not self-adopted"
   long-term? Still open, unrelated to the rest of this work.
-- **The `<!-- dlp-ignore -->` bug found this phase** — worth fixing?
-  Two real options: widen `ignore._INLINE_IGNORE_RE` to accept HTML
-  comments (changes suppression behavior for every user of this tool,
-  not just this repo — a real, if small, behavior change worth its own
-  scoped look), or simply fix `README.md`'s own example/flowchart to use
-  the syntax that already works (`# dlp-ignore`). The second is safer and
-  smaller; the first is arguably the more "correct" fix if HTML-comment
-  suppression was always the intended experience for Markdown files.
 - **The platform-scale rebuild request from two phases ago** — still
   declined by default per every relevant ADR; only worth revisiting on a
   deliberate decision to reopen one of them.
@@ -169,8 +165,6 @@ Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
 ## Potential risks if continuing unattended
 
 - None — everything through Phase 7 has been gated and benchmark-verified
-  with no regressions. The one thing that's a real, live decision (not
-  just documentation) is the `<!-- dlp-ignore -->` bug above — fixing the
-  regex changes real suppression behavior for anyone using this tool, so
-  that specific fix (if pursued) deserves the same rigor as any other
-  behavior change, not a drive-by patch.
+  with no regressions, including the inline-ignore behavior change
+  (`d519e33`), which was explicitly proposed as a choice and confirmed by
+  the human before being implemented, not decided unilaterally.
