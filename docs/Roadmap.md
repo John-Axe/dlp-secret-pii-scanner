@@ -8,7 +8,7 @@ marketing — every "done" phase links to the actual commits, and
 `[Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md) is the authoritative
 record of what exists but hasn't shipped in a tagged release yet (still
 just `v0.1.0` as of this writing — see
-[`Operations.md`](Operations.md#versioning-and-upgrades)).
+[`Operations.md`](Operations.md#upgrading)).
 
 ## Phase 1 — Quick wins ✅ Done
 

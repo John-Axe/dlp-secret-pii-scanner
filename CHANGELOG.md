@@ -12,6 +12,18 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/FAQ.md` — genuinely new synthesis, not restated from
+  `Limitations.md`/the ADRs: why this tool detects secrets and PII
+  together rather than as two separate tools (grounded in `detectors.py`
+  and `shared_finding.py` — the secret/PII distinction exists only as a
+  five-entry lookup table at the ecosystem-export boundary, nowhere else
+  in the pipeline), how to check the benchmark's 94%/100% numbers aren't
+  cherry-picked (CI-enforced, self-reproducible, with the corpus's own
+  small/synthetic size named as a real limit on what the number actually
+  proves), and how this tool positions against gitleaks/detect-secrets
+  (different scope — working tree vs. git history — not a replacement,
+  which is exactly why this repo runs gitleaks in its own CI too). Two
+  short entries point to ADR 0002/0003 rather than restating them.
 - `docs/Roadmap.md` — the five-phase engineering pass laid out as a real,
   linkable record: every commit from Phases 1-4 tabulated by phase, and
   Phase 5's own scope decision (three of six original candidate docs
