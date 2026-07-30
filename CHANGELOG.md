@@ -12,6 +12,16 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Performance.md` — this session's measured throughput numbers,
+  framed explicitly as machine-specific rather than a portable claim; why
+  the CI-gated smoke test asserts a generous ceiling instead of a
+  throughput floor; and the algorithm's actual shape (every line pays the
+  cost of all 10 regex detectors plus entropy tokenization,
+  unconditionally — described from reading `scanner.py`/`detectors.py`,
+  explicitly labeled as not a profiler-measured result). Names known
+  non-optimizations (no regex pre-filtering, no `--jobs` auto-tuning, no
+  cross-run caching) directly rather than leaving them to look like
+  oversights.
 - `docs/Operations.md` — practical running/upgrading/maintenance guidance
   for all three distribution paths, including two details not written
   down anywhere else: pre-commit's own `types: [text]` filtering runs
