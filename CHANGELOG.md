@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Roadmap.md` — the five-phase engineering pass laid out as a real,
+  linkable record: every commit from Phases 1-4 tabulated by phase, and
+  Phase 5's own scope decision (three of six original candidate docs
+  skipped — `Design-Decisions.md`, `Case-Study.md`, `Development-Log.md`
+  — as substantial duplicates of `docs/adr/` and this pass's own commit
+  history) named explicitly rather than left implicit. Closes out the
+  "worth doing since it doesn't exist as a file anywhere yet" item from
+  `NEXT_SESSION.md`'s Phase 5 assessment.
 - `docs/adr/0004-finding-fingerprint-design.md` — retroactive ADR
   formalizing `Finding.fingerprint`'s existing docstring reasoning.
   Documents why the fingerprint hashes `redacted` rather than the raw
