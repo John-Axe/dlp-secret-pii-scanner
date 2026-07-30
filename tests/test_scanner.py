@@ -8,7 +8,20 @@ import pytest
 
 from dlp import severity
 from dlp.ignore import is_path_ignored, load_dlpignore
-from dlp.scanner import scan_file, scan_paths
+from dlp.scanner import ScanStats, scan_file, scan_paths
+
+
+class _UnreadablePath:
+    """Stands in for a Path whose .open() raises OSError - a permission-
+    denied file, or one removed between listing and reading (a TOCTOU race
+    in a full-tree scan). Real permission bits are unreliable to test
+    against directly (root ignores them; behavior varies by CI runner);
+    this deterministically exercises the same `except OSError` branch
+    scan_file actually has, regardless of environment.
+    """
+
+    def open(self, *args, **kwargs):
+        raise OSError("permission denied")
 
 
 def test_scan_file_finds_planted_secret(tmp_path: Path):
@@ -70,6 +83,72 @@ def test_is_path_ignored_matches_directory_pattern():
 
 
 def test_binary_file_is_skipped(tmp_path: Path):
+    target = tmp_path / "blob.bin"
+    target.write_bytes(b"\x00\x01\x02AKIAIOSFODNN7EXAMPLE")
+    stats = ScanStats()
+
+    findings = scan_file(target, stats=stats)
+
+    assert findings == []
+    assert stats.files_skipped_binary == 1
+    assert stats.files_scanned == 0
+
+
+def test_unreadable_file_is_skipped_and_counted_not_silently_dropped():
+    """The bug this pins: scan_file's `except OSError: return []` used to
+    make a permission-denied or race-deleted file indistinguishable from a
+    clean file with no findings - both just produced []. Now it's visible
+    in stats instead."""
+    stats = ScanStats()
+
+    findings = scan_file(_UnreadablePath(), display_path="secret.txt", stats=stats)
+
+    assert findings == []
+    assert stats.files_skipped_unreadable == 1
+    assert stats.files_scanned == 0
+
+
+def test_oversized_file_is_skipped_and_counted_not_silently_dropped(tmp_path, monkeypatch):
+    """The other bug this pins: a file over MAX_FILE_SIZE_BYTES used to be
+    silently indistinguishable from a clean file - same [] either way. Uses
+    a monkeypatched, tiny size cap rather than writing literal megabytes to
+    disk, but exercises the exact same size-check branch."""
+    monkeypatch.setattr("dlp.scanner.MAX_FILE_SIZE_BYTES", 10)
+    target = tmp_path / "big.txt"
+    target.write_text("this file is well over ten bytes long\n")
+    stats = ScanStats()
+
+    findings = scan_file(target, stats=stats)
+
+    assert findings == []
+    assert stats.files_skipped_too_large == 1
+    assert stats.files_scanned == 0
+
+
+def test_scan_stats_total_skipped_sums_all_skip_reasons():
+    stats = ScanStats(files_skipped_too_large=1, files_skipped_binary=2, files_skipped_unreadable=3)
+    assert stats.total_skipped == 6
+
+
+def test_scan_paths_aggregates_stats_across_multiple_files(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("dlp.scanner.MAX_FILE_SIZE_BYTES", 10)
+    (tmp_path / "clean.txt").write_text("short\n")
+    (tmp_path / "blob.bin").write_bytes(b"\x00\x01\x02binary")
+    (tmp_path / "big.txt").write_text("this file is well over ten bytes long\n")
+    stats = ScanStats()
+
+    scan_paths([tmp_path], stats=stats)
+
+    assert stats.files_scanned == 1
+    assert stats.files_skipped_binary == 1
+    assert stats.files_skipped_too_large == 1
+    assert stats.total_skipped == 2
+
+
+def test_scan_file_without_stats_arg_behaves_exactly_as_before(tmp_path: Path):
+    """stats is optional and defaults to None - every pre-existing call site
+    (and most of this file's other tests) doesn't pass it. Confirms that
+    path still works with zero behavior change."""
     target = tmp_path / "blob.bin"
     target.write_bytes(b"\x00\x01\x02AKIAIOSFODNN7EXAMPLE")
 
@@ -167,6 +246,22 @@ def test_fingerprint_stable_across_line_number_changes(tmp_path):
     fp1 = scan_file(f1, display_path="same.txt")[0].fingerprint
     fp2 = scan_file(f2, display_path="same.txt")[0].fingerprint
     assert fp1 == fp2
+
+
+@pytest.mark.parametrize(
+    "skip_dir", ["node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", ".hypothesis"]
+)
+def test_scan_paths_skips_default_skip_dirs(tmp_path: Path, skip_dir: str):
+    nested = tmp_path / skip_dir / "sub"
+    nested.mkdir(parents=True)
+    (nested / "secret.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    (tmp_path / "app.py").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    findings = scan_paths([tmp_path])
+
+    files_with_findings = {f.file for f in findings}
+    assert not any(skip_dir in f for f in files_with_findings)
+    assert any("app.py" in f for f in files_with_findings)
 
 
 def test_scan_file_skips_symlinks(tmp_path):

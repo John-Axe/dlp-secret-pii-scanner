@@ -189,6 +189,47 @@ def test_python_dash_m_dlp_runs_as_a_module(tmp_path: Path):
     assert "aws_access_key_id" in result.stdout
 
 
+def test_cli_reports_skipped_files_on_stderr(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.setattr("dlp.scanner.MAX_FILE_SIZE_BYTES", 50)
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")  # 18 bytes, under the cap
+    (tmp_path / "big.txt").write_text("x" * 200 + "\n")  # 201 bytes, over the cap
+
+    main([str(tmp_path), "--fail-on", "none"])
+    captured = capsys.readouterr()
+
+    assert "1 file(s) skipped" in captured.err
+    assert "1 too large" in captured.err
+    assert "skipped" not in captured.out  # never leaks into the findings stream
+
+
+def test_cli_says_nothing_about_skips_when_nothing_was_skipped(tmp_path: Path, capsys):
+    """Regression guard against the opposite failure mode: printing a
+    "0 skipped" line on every ordinary run would just be noise in CI logs
+    for the common case."""
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    main([str(tmp_path), "--fail-on", "none"])
+    captured = capsys.readouterr()
+
+    assert captured.err == ""
+
+
+def test_cli_json_stdout_stays_valid_json_even_when_files_were_skipped(tmp_path: Path, capsys, monkeypatch):
+    """The reason the skip summary goes to stderr, not stdout: --format
+    json's stdout is a machine-readable contract (piped into --emit-findings
+    consumers, jq, etc.) that can't carry an extra human-readable line."""
+    monkeypatch.setattr("dlp.scanner.MAX_FILE_SIZE_BYTES", 50)
+    (tmp_path / "creds.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")  # 39 bytes, under the cap
+    (tmp_path / "big.txt").write_text("x" * 200 + "\n")  # 201 bytes, over the cap
+
+    main([str(tmp_path), "--format", "json", "--fail-on", "none"])
+    captured = capsys.readouterr()
+
+    findings = json.loads(captured.out)  # raises if stdout isn't clean JSON
+    assert any(f["rule_id"] == "aws_access_key_id" for f in findings)
+    assert "skipped" in captured.err
+
+
 def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
     changed = tmp_path / "changed.txt"
@@ -206,3 +247,56 @@ def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
     findings = json.loads(capsys.readouterr().out)
 
     assert findings == []
+
+
+def test_cli_picks_up_fail_on_from_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")  # a "low"-severity finding
+
+    exit_code = main(["."])  # no --fail-on flag on the CLI at all
+
+    assert exit_code == 1  # config's fail_on=low applies; the hardcoded default (high) would give 0
+
+
+def test_cli_flag_overrides_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")
+
+    exit_code = main([".", "--fail-on", "critical"])  # explicit flag should win over config
+
+    assert exit_code == 0
+
+
+def test_cli_no_config_flag_ignores_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")
+
+    exit_code = main([".", "--no-config"])  # falls back to the hardcoded default (high)
+
+    assert exit_code == 0
+
+
+def test_cli_reports_invalid_config_on_stderr_and_exits_nonzero(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "not-a-real-severity"\n', encoding="utf-8")
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    exit_code = main(["."])
+
+    assert exit_code == 1
+    assert "fail_on" in capsys.readouterr().err
+
+
+def test_cli_entropy_threshold_from_config_is_used(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nentropy_threshold = 8.0\n', encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
+
+    main([".", "--format", "json", "--fail-on", "none"])
+    findings = json.loads(capsys.readouterr().out)
+
+    # threshold 8.0 is above what this token's entropy reaches, so it's never flagged
+    assert not any(f["rule_id"] == "high_entropy_string" for f in findings)

@@ -25,6 +25,51 @@ added in the same PR as the change it describes.
   previously only in the README.
 - Three structured issue forms (false positive, new detector request, bug report),
   a PR template mirroring the CONTRIBUTING.md pre-PR checklist, and `CODEOWNERS`.
+- CI now runs `ruff check` and `mypy src/` (strict) as required gates, and the test
+  job enforces a 90% coverage floor (`pytest-cov`) with `--cov-report=term-missing`
+  surfacing exactly which lines aren't. `src/dlp/py.typed` (PEP 561) is added so
+  downstream consumers of the published package get type-checking benefit from it
+  too, not just this repo's own CI.
+- `scripts/coverage_badge.py` generates a shields.io coverage badge from a
+  `coverage json` report the same way `benchmark/run_benchmark.py` already
+  generates the precision/recall badge — CI regenerates and commits both on every
+  push to `main` if they changed.
+- `dlp-scan` now reports skipped files on stderr (count and reason: too large /
+  binary / unreadable) whenever at least one file was skipped, instead of
+  silently producing the same empty result a clean scan would.
+- `dlp.github_pr` now caps inline PR comments at 25 by default (`--max-comments`,
+  highest-severity findings kept when over the cap) and retries a detected
+  GitHub rate limit (429, or a 403 carrying `Retry-After`/exhausted
+  `X-RateLimit-Remaining`) with GitHub-directed backoff, up to 3 attempts.
+- Property-based tests (`hypothesis`) for the Luhn credit-card validator, the
+  SSN validator, and Shannon entropy — generated inputs alongside the existing
+  hand-picked examples, covering invariants like "any single-digit corruption
+  of a valid card number is always rejected" and "entropy is invariant under
+  shuffling" that example-based tests don't naturally reach.
+- `pyproject.toml`'s `[tool.dlp]` table can now supply per-project defaults for
+  `--format`/`--fail-on`/`--no-entropy`/`--entropy-threshold`/`--no-color`/
+  `--base-ref`, so a team doesn't have to repeat CLI flags on every invocation.
+  CLI flags always win; `--no-config` opts out entirely. Uses stdlib `tomllib`
+  (3.11+) rather than a new runtime dependency — a documented no-op, not a
+  crash, on Python 3.10.
+
+### Fixed
+- Two silent-failure paths in `scan_file` — a file over 5MB and a file that
+  raised `OSError` on read (permission denied, or removed mid-scan) — both
+  previously returned `[]` indistinguishably from "scanned, no findings."
+  Both are now counted and surfaced (see Added, above).
+- `dlp.github_pr.post_review_comments` previously had no bound on how many
+  sequential requests it would fire for a single PR, and any non-422 HTTP
+  error (including a transient rate limit) propagated as an unhandled
+  traceback with no partial-progress information. Now bounded and
+  rate-limit-aware (see Added, above); a genuine permissions error (a bare
+  403) still raises immediately rather than being retried into a slower,
+  more confusing failure.
+- `DEFAULT_SKIP_DIRS` didn't include `.hypothesis` or `.ruff_cache` — adopting
+  either tool caused `dlp-scan .` to walk into their cache internals and flag
+  cached bytes as high-entropy findings (discovered by this repo self-scanning
+  itself right after adopting `hypothesis`). Fixed at the source in `scanner.py`
+  so this doesn't recur for any project that adopts either tool, not just this one.
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).

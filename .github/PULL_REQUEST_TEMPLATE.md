@@ -4,7 +4,9 @@
 
 ## Checklist
 
-- [ ] `pytest -v` passes locally
+- [ ] `ruff check .` passes
+- [ ] `mypy src/` passes
+- [ ] `pytest -v --cov=dlp --cov-report=term-missing` passes (90% coverage floor)
 - [ ] `python benchmark/run_benchmark.py --min-precision 0.85 --min-recall 0.85` passes
 - [ ] `dlp-scan . --fail-on critical` (self-scan) passes
 - [ ] If this adds/changes a detector: `benchmark/corpus/` and `benchmark/labels.json`

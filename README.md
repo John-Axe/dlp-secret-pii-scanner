@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/John-Axe/dlp-secret-pii-scanner/actions/workflows/codeql.yml/badge.svg)](https://github.com/John-Axe/dlp-secret-pii-scanner/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/John-Axe/dlp-secret-pii-scanner/badge)](https://securityscorecards.dev/viewer/?uri=github.com/John-Axe/dlp-secret-pii-scanner)
 [![Benchmark](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/benchmark.json)](benchmark/run_benchmark.py)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/coverage.json)](CONTRIBUTING.md)
 
 **94% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
 PII at commit time (pre-commit hook), at PR review time (inline comments + diff-only
@@ -100,7 +101,7 @@ Two mechanisms, same as `.gitignore` muscle memory:
   *.lock
   ```
 
-## Upgrades: SARIF, PR comments, diff-only/baseline, live badge
+## Upgrades: SARIF, PR comments, diff-only/baseline, live badge, config file
 
 ### 1. SARIF output + GitHub Security tab
 
@@ -132,6 +133,15 @@ permissions:
   pull-requests: write
   security-events: write
 ```
+
+Capped at 25 comments per run by default (`--max-comments`), highest severity
+first — a PR with hundreds of findings (e.g. a leaked-credentials dump, exactly
+what this tool exists to catch) posts its most severe findings inline and prints
+how many more weren't shown, instead of firing hundreds of sequential requests
+and risking GitHub's secondary rate limit. A detected rate limit (429, or a 403
+carrying `Retry-After`/an exhausted `X-RateLimit-Remaining`) is retried with
+GitHub-directed backoff up to 3 times before giving up; a bare 403 (a real
+permissions error, e.g. a token missing `pull-requests: write`) is never retried.
 
 ### 3. Diff-only scanning + baseline mode
 
@@ -166,6 +176,29 @@ job regenerates that file on every push to `main` via
 `run_benchmark.py --badge-output .github/badges/benchmark.json` and commits it back to
 the repo only if the numbers changed - the badge is always exactly what the last
 benchmark run produced, never hand-edited.
+
+### 5. Per-project defaults in `pyproject.toml`
+
+`--format`, `--fail-on`, `--no-entropy`, `--entropy-threshold`, `--no-color`, and
+`--base-ref` can all live in a `[tool.dlp]` table instead of being repeated on
+every invocation or wrapped in a Makefile/CI step:
+
+```toml
+[tool.dlp]
+fail_on = "critical"
+entropy_threshold = 4.5
+```
+
+A CLI flag always wins over the config file; `--no-config` ignores it entirely.
+The nearest `pyproject.toml` walking up from the current directory is used, the
+same search direction `git`/`pre-commit` use. An unknown key or an invalid value
+(e.g. `fail_on = "critcal"`) fails loudly on stderr rather than being silently
+ignored - see [`CONTRIBUTING.md`](CONTRIBUTING.md) for why this project prefers
+explicit failure over silent misconfiguration. Uses Python's stdlib `tomllib`
+(3.11+) rather than adding a TOML-parsing runtime dependency; on Python 3.10
+(still within this project's supported range) config loading is a documented
+no-op, not a crash - the CLI works exactly as it always has, just without this
+one convenience.
 
 ## Usage
 

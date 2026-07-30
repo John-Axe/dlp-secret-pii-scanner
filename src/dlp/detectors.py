@@ -11,7 +11,6 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -171,7 +170,7 @@ def scan_line_entropy(line: str, threshold: float) -> list[Match]:
     return matches
 
 
-def all_rule_metadata() -> list[dict]:
+def all_rule_metadata() -> list[dict[str, str]]:
     """Stable rule_id/name/severity for every detector, including entropy.
 
     Used to build the SARIF `rules` array so it's complete even on a run
