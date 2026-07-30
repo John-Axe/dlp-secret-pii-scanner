@@ -1,85 +1,85 @@
-# Handoff — engineering transformation, in progress
+# Handoff — engineering transformation, Phase 5 complete
 
-**Last updated:** 2026-07-30, Phase 4 complete, Phase 5 not yet started.
+**Last updated:** 2026-07-30, Phase 5 complete. All five originally-scoped
+phases are now done.
 **Read this file first** if you're picking this work up cold — it should let
 you continue without re-deriving anything below.
 
 ## What this is
 
-`dlp-secret-pii-scanner` is going through a structured engineering-quality
+`dlp-secret-pii-scanner` went through a structured engineering-quality
 pass: audit → 5-phase roadmap → incremental, individually-verified PRs, each
 with its own Goal/Reasoning/Tradeoffs writeup in its commit message. Nothing
-has been pushed to `origin` or merged — everything lives on four stacked
+has been pushed to `origin` or merged — everything lives on five stacked
 local branches, one commit per coherent change, matching how this repo
-already holds PR merges for an explicit human go-ahead.
+already holds PR merges for an explicit human go-ahead. `docs/Roadmap.md`
+now has the full phase-by-phase breakdown with commit references — this
+file stays focused on handoff state, not a duplicate of that table.
 
 ## Completed work
 
 ### Phase 1 — Quick wins (`engineering-audit/phase-1-quick-wins`, 5 commits)
-`CONTRIBUTING.md`, `CHANGELOG.md`, issue/PR templates + `CODEOWNERS`,
-`--version`/`python -m dlp`/`--help` examples.
-
 ### Phase 2 — Engineering improvements (`engineering-audit/phase-2-engineering-improvements`, 6 commits)
-CI gates (ruff/mypy strict/90% coverage + `py.typed`), fixed two silent-skip
-bugs (`ScanStats`), bounded + rate-limit-hardened `github_pr.py`, Hypothesis
-property tests, `pyproject.toml [tool.dlp]` config support.
+### Phase 3 — Architecture improvements (`engineering-audit/phase-3-architecture-improvements`, 6 commits)
+### Phase 4 — Production-readiness docs (`engineering-audit/phase-4-production-docs`, 7 commits)
 
-### Phase 3 — Architecture improvements (`engineering-audit/phase-3-architecture-improvements`, 6 commits) — COMPLETE
-ADR 0001 (no plugin system), throughput benchmark + CI-gated perf smoke
-test, `--jobs` parallel scanning (measured threads vs. processes
-empirically — processes won, 1.4-3.6x; threads were *slower*),
-`-v`/`--verbose` + `-q`/`--quiet` structured logging.
+See [`docs/Roadmap.md`](docs/Roadmap.md) for what each phase actually
+contains, tabulated by commit hash.
 
-### Phase 4 — Production-readiness docs (`engineering-audit/phase-4-production-docs`, 6 commits) — **COMPLETE**
-1. `76f1798` — `docs/Limitations.md`
-2. `165b032` — `docs/Threat-Model.md`
-3. `35c492e` — `docs/Architecture.md` (component/sequence/deployment diagrams)
-4. `52aa625` — `docs/Operations.md`
-5. `49dc176` — `docs/Performance.md`
-6. `eabbca1` — `docs/Troubleshooting.md`
+### Phase 5 — Retroactive design records (`engineering-audit/phase-5-retroactive-docs`, 5 commits) — **COMPLETE**
+1. `c8fc67e` — [ADR 0002](docs/adr/0002-zero-runtime-dependencies.md) —
+   zero runtime dependencies
+2. `becd9f4` — [ADR 0003](docs/adr/0003-regex-entropy-over-ml-classifier.md)
+   — regex + Shannon entropy, not an ML/statistical classifier
+3. `5fed6fd` — [ADR 0004](docs/adr/0004-finding-fingerprint-design.md) —
+   `Finding.fingerprint` design
+4. `32dbdcf` — `docs/Roadmap.md`
+5. `07c9e37` — `docs/FAQ.md`
 
-All six docs cross-link each other rather than duplicating content. **Three
-real factual corrections were caught and fixed while writing these, before
-committing** — worth knowing about if auditing this pass's rigor:
-- `Threat-Model.md`: an early draft over-attributed a backtick-escaping
-  defense to the wrong module; `grep` showed `detectors.redact()` already
-  does it, `github_pr.py`'s copy is a deliberate second layer, not the sole
-  defense.
-- `Architecture.md`: an early draft linked to a README section
-  (`#4-auto-updating-benchmark-badge`) as if it described the release
-  pipeline — it doesn't; `grep`ing the README for "release"/"Sigstore"
-  turned up nothing, so the release pipeline is now documented directly in
-  `Architecture.md` instead of citing a nonexistent source.
-- `Architecture.md`: an early draft stated "PyPI publish via OIDC Trusted
-  Publisher" as settled fact; re-reading `release.yml` showed that step is
-  `continue-on-error: true` pending PyPI-side configuration — corrected to
-  not overclaim a working end-to-end publish.
+**Scope, resolved before writing anything**: the original six-item Phase 5
+list included `docs/Design-Decisions.md`, `docs/Case-Study.md`, and
+`docs/Development-Log.md`. All three were skipped — they'd have
+substantially duplicated `docs/adr/` (the ADRs already are the
+design-decisions record) and Phase 4's docs/this pass's own commit
+history, which is exactly the duplication risk this file flagged before
+Phase 5 started. `docs/FAQ.md` was written only after confirming it had
+genuinely new content (three synthesis entries: why secrets+PII are one
+tool's job not two, how to check the benchmark numbers aren't cherry-picked,
+how this positions against gitleaks/detect-secrets) rather than restating
+`Limitations.md`/the ADRs.
 
-**Net across all four phases:** 130 → 215 tests, coverage 96.45% → 97.46%,
-five real code bugs found and fixed, three real documentation inaccuracies
-caught and fixed before committing (not after). Every code commit verified
-against the full local gate sequence; every doc commit self-scanned and,
-where it made a specific factual claim, checked against the actual source
-it was describing.
+**Net across all five phases:** 130 → 215 tests (unchanged since Phase 4 —
+Phase 5 was pure documentation, no code touched), coverage 96.45% → 97.46%,
+five real code bugs found and fixed (Phases 1-3), three real documentation
+inaccuracies caught and fixed before committing (Phase 4), one real
+previously-undocumented behavior surfaced while formalizing existing
+reasoning (Phase 5: `Finding.fingerprint`'s short-secret collision case,
+already handled correctly by `cli.py`'s `--write-baseline` count logic but
+never named). Every doc commit self-scanned and gate-checked (ruff, mypy,
+pytest+coverage, benchmark, self-scan) before committing.
 
 ## Current state (for orientation, not re-derivation)
 
 ```
-src/dlp/          11 modules, no circular imports (see Architecture.md)
+src/dlp/          11 modules, no circular imports (see docs/Architecture.md)
 docs/
   adr/0001-no-plugin-system-yet.md
+  adr/0002-zero-runtime-dependencies.md
+  adr/0003-regex-entropy-over-ml-classifier.md
+  adr/0004-finding-fingerprint-design.md
   Limitations.md, Threat-Model.md, Architecture.md,
-  Operations.md, Performance.md, Troubleshooting.md
+  Operations.md, Performance.md, Troubleshooting.md,
+  Roadmap.md, FAQ.md
 benchmark/        run_benchmark.py (CI-gated) + run_throughput_benchmark.py (not)
 tests/            215 tests, 97.46% coverage, 90% CI floor
 ```
 
-Zero runtime dependencies — respect it. `tomllib`/`hypothesis`/`pytest-cov`/
-`ruff`/`mypy` are dev-only.
+Zero runtime dependencies — respect it, see ADR 0002. `tomllib`/
+`hypothesis`/`pytest-cov`/`ruff`/`mypy` are dev-only.
 
 ## Known issues / gaps still open
 
-- Same short list as before, unchanged by Phase 4 (pure docs, no code
+- Same short list as before, unchanged by Phase 5 (pure docs, no code
   touched): `scanner.py:90,121,192-201`, `github_pr.py:231-232`,
   `cli.py:306` — all pre-existing or process-boundary coverage gaps, none
   tied to a real bug.
@@ -87,71 +87,51 @@ Zero runtime dependencies — respect it. `tomllib`/`hypothesis`/`pytest-cov`/
   `ProcessPoolExecutor` path especially closely on first push — different
   CI runner characteristics or multiprocessing start-method defaults than
   this sandbox's Python 3.14 `forkserver`.
-- `v0.1.0` is still the only tag — everything in Phases 1-4 is
-  `[Unreleased]`. `docs/Operations.md` states this explicitly for readers;
-  worth remembering here too before assuming any of this has "shipped."
+- `v0.1.0` is still the only tag — everything in Phases 1-5 is
+  `[Unreleased]`.
+- `Finding.fingerprint` has a real, now-documented collision case for
+  short secrets (≤8 chars, same file/rule) — see
+  [ADR 0004](docs/adr/0004-finding-fingerprint-design.md)'s Consequences.
+  Not a bug (baseline/CLI code already accounts for it via set dedup), just
+  a precision limit worth knowing about if it's ever reported as surprising
+  behavior.
 
-## Recommended next task: Phase 5 (lower priority, discretionary)
+## A mid-session event worth knowing about
 
-Phase 5 was originally scoped as: `docs/Design-Decisions.md`, `docs/FAQ.md`,
-`docs/Roadmap.md`, `docs/Development-Log.md`, `docs/Case-Study.md`, plus
-retroactive ADRs (0002: zero-runtime-dependencies; 0003: regex+entropy over
-an ML classifier; 0004: the fingerprint design).
-
-**Worth a judgment call before starting, not just executing the list:**
-several Phase 5 items risk *restating* content that now lives correctly in
-Phase 4's docs rather than adding new value:
-- `docs/Design-Decisions.md` would substantially overlap `docs/adr/` — the
-  ADRs already are the design-decisions record. If written, this should be
-  a short index/pointer into `docs/adr/`, not a parallel narrative that
-  duplicates what an ADR already says more precisely.
-- `docs/Roadmap.md` — the original audit's own 5-phase roadmap (in this
-  conversation's history, never yet promoted to a committed file) is the
-  real candidate content here. Worth doing since it doesn't exist as a
-  file anywhere yet, unlike Design-Decisions.
-- `docs/Case-Study.md` and `docs/Development-Log.md` risk becoming a sixth
-  narration of the same "we measured, found a bug, fixed it" stories
-  already told once, well, in this session's own commit messages. If
-  written, pull from `git log` directly rather than re-narrating from
-  memory, and keep it short — a highlight reel linking to the actual
-  commits, not a retelling.
-- `docs/FAQ.md` — genuinely likely to have real, non-duplicative content
-  (the kind of question a reader asks that doesn't fit `Troubleshooting.md`'s
-  symptom-fix format, e.g. "why zero dependencies," "why not use an
-  existing tool like gitleaks/detect-secrets instead") — but only if the
-  answers are new synthesis, not copy-pasted from `Limitations.md`/ADRs.
-- **Retroactive ADRs (0002-0004)** are probably the highest-value remaining
-  Phase 5 item: real decisions, not yet written down, with the same
-  "grounded in what actually happened" standard as ADR 0001 — 0004
-  specifically (`Finding.fingerprint`'s design) already has its reasoning
-  written as a docstring in `scanner.py`, so writing it is mostly
-  formalizing existing reasoning into the ADR format, low risk of drift.
-
-**Suggested order if continuing**: 0002 → 0003 → 0004 (retroactive ADRs,
-each grounded in existing code/docstrings) → `docs/Roadmap.md` (real
-content, doesn't exist yet) → `docs/FAQ.md` (if genuinely new content
-exists) → skip or heavily scope down `Design-Decisions.md`/`Case-Study.md`/
-`Development-Log.md` given the duplication risk named above, unless there's
-a clear angle that doesn't just restate Phase 4/`docs/adr/`.
-
-**Estimated effort:** 3-5 hours if all done; less if the lower-value items
-are skipped or scoped down per the judgment call above. **Risk: none**
-(pure documentation).
+Partway through Phase 5, a message arrived asking for a total ground-up
+rebuild: new `docs/` paths duplicating what already exists (different
+casing — `docs/architecture.md` vs. the actual `docs/Architecture.md`),
+a plugin architecture and an ML-classification roadmap item (both directly
+contradicting ADR 0001 and ADR 0003), Docker/REST API/VS Code extension
+additions, a full README/CI rewrite, and an open-ended "never stop
+iterating" directive — a sharp reversal of this session's scoped,
+stop-when-done instructions. Flagged directly rather than acted on; you
+said to finish Phase 5 as originally scoped first and treat that request as
+a separately-scoped follow-up to evaluate afterward, not as this session's
+task. **It has not been evaluated or acted on at all** — if it's still
+wanted, it needs a real scoping pass (most of it either duplicates
+completed work under new names or reopens decisions already made in
+`docs/adr/`), not a literal execution of the original message.
 
 ## Open questions for the human
 
-- Push Phases 1-4 now for real CI validation? Phase 4 added zero code risk
-  on top of Phase 3's `--jobs` change, so the case for pushing sooner
-  rather than later is stronger now than it was after Phase 3 alone.
-- Is Phase 5 worth doing in full, or is the judgment call above (skip/scope
-  down the duplication-risk items) the right read? This is a genuine
-  question for you, not a decision already made on your behalf.
-- Is `[tool.dlp]` config support something you want dog-fooded in this
-  repo's own `pyproject.toml`, or "built and tested, not self-adopted"
-  long-term?
+- **Push Phases 1-5 now for real CI validation?** Phase 4/5 added zero
+  code risk on top of Phase 3's `--jobs` change — the case for pushing
+  sooner rather than later hasn't gotten weaker.
+- **Is `[tool.dlp]` config support something you want dog-fooded in this
+  repo's own `pyproject.toml`**, or "built and tested, not self-adopted"
+  long-term? Still open, unrelated to Phase 5's docs work — this repo does
+  not currently use its own config feature.
+- **The mid-session rebuild request above** — worth a real look, or was it
+  noise/a mistake? If there's a real kernel worth pursuing (a `SECURITY.md`
+  policy file is a plausible, non-duplicative gap this repo doesn't have
+  yet, for instance), it should be scoped as its own deliberate pass, not
+  inherited wholesale.
 
 ## Potential risks if continuing unattended
 
-- None — Phase 5 as scoped is pure documentation. The one real judgment
-  call (which items to skip/scope down to avoid duplicating Phase 4) is
-  laid out above rather than left implicit.
+- None — everything through Phase 5 is pure documentation or already
+  gated/verified code from Phases 1-3. The one thing that needs a human
+  decision before any agent acts on it is the mid-session rebuild request
+  above — it's large, contradicts committed ADRs in places, and was
+  explicitly not evaluated this session.
