@@ -11,6 +11,19 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Added
+- Four new benchmark negative fixtures, each a specific false-positive
+  trap not previously in the corpus: `token_prefix_mentions.md` (docs
+  mentioning AWS/GitHub/GitLab/Slack token prefixes without a real
+  token), `boundary_length_tokens.txt` (a GitHub-token-shaped string one
+  char short of 36, a lowercase AWS-key-shaped string, a JWT missing its
+  third segment), `pkcs8_public_key.pem` (PKCS#8 public key header, a
+  `private_key_block` near-miss), `config_with_env_placeholders.json`
+  (JSON-format `${VAR}` placeholders, complementing the existing
+  YAML/env versions). Each verified to produce zero findings before
+  adding its `labels.json` entry. No change to benchmark numbers (all
+  four are true negatives, as designed).
+
 ### Fixed
 - Inline suppression (`ignore._INLINE_IGNORE_RE`) required a literal `#`
   or `//` before `dlp-ignore` — the `<!-- dlp-ignore -->` HTML-comment

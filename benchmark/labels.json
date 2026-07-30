@@ -20,5 +20,9 @@
   "negatives/ignored_test_fixture.py": [],
   "negatives/lockfile_like.txt": [],
   "negatives/embedded_icon_asset.py": [],
-  "negatives/invalid_lookalikes.txt": []
+  "negatives/invalid_lookalikes.txt": [],
+  "negatives/token_prefix_mentions.md": [],
+  "negatives/boundary_length_tokens.txt": [],
+  "negatives/pkcs8_public_key.pem": [],
+  "negatives/config_with_env_placeholders.json": []
 }

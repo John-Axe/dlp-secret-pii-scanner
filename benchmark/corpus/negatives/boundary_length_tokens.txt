@@ -1,0 +1,5 @@
+Format-boundary test cases (not real secrets, benchmark negative fixture).
+
+GitHub-shaped but one character short of the real 36-char body: ghp_0000000000000000000000000000000000A
+AWS-shaped but lowercase (invalid - AWS key IDs are uppercase only): akia0000000000000000
+JWT-shaped prefix but missing the third (signature) segment: eyJexample-header.eyJexample-payload
