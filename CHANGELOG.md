@@ -12,6 +12,11 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/adr/` — Architecture Decision Records, starting with
+  [0001](docs/adr/0001-no-plugin-system-yet.md): why detectors stay a
+  hardcoded list rather than growing a plugin/entry-point system, grounded
+  in this project's actual detector-addition history (zero new rules since
+  the initial commit) rather than a guess.
 - `findings.jsonl` output via `--emit-findings`, mapping this tool's findings onto
   the ecosystem-wide shared finding schema (severity, MITRE ATT&CK, OWASP fields)
   for consumption by `observability-stack`'s Promtail/Loki/Grafana pipeline.
