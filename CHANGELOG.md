@@ -11,6 +11,15 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Fixed
+- `aws_access_key_id` matched 8 AWS unique-ID prefixes but only 2 (`AKIA`,
+  `ASIA`) are actual credentials — the other 6 (`AGPA`/`AIDA`/`AIPA`/
+  `ANPA`/`ANVA`/`AROA`, verified against AWS's own IAM unique-identifier
+  reference) are AWS's internal resource-identifier prefixes (user group,
+  IAM user, instance profile, managed policy, policy version, role), not
+  secrets. Narrowed the pattern to `AKIA`/`ASIA` only. No benchmark
+  regression (the corpus only ever used `AKIA`-prefixed fixtures).
+
 ### Added
 - `CONTRIBUTING.md` — new "Testing philosophy" section after the existing
   "Adding a new detector" checklist, explaining the five real test

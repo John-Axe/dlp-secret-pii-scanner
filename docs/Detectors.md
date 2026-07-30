@@ -30,27 +30,27 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `aws_access_key_id` — AWS Access Key ID
 
 - **Severity**: `high`
-- **Pattern**: `\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b`
+- **Pattern**: `\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`
 - **Detection strategy**: AWS unique identifiers are a fixed-length,
   base32-ish alphabet (`[0-9A-Z]`) string with a stable 4-letter prefix
-  denoting resource type. This pattern matches any of 8 known prefixes
-  followed by exactly 16 such characters — no validator, since the prefix
-  set itself is the signal.
-- **Known false positive, verified against AWS's own docs**: only 2 of the
-  8 matched prefixes are actually *credentials*. Per
-  [AWS's IAM unique-ID-prefix reference](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes):
+  denoting resource type. This pattern matches the two prefixes that are
+  actually credentials — no validator, since the prefix set itself is the
+  signal.
+- **Verified against AWS's own docs, and narrowed accordingly**: per
+  [AWS's IAM unique-ID-prefix reference](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes),
   `AKIA` is a long-term access key and `ASIA` is a temporary (STS) access
-  key ID — real secrets. The other six this pattern also matches are
-  **not credentials at all**: `AGPA` (user group), `AIDA` (IAM user),
-  `AIPA` (EC2 instance profile), `ANPA` (managed policy), `ANVA` (managed
-  policy version), `AROA` (role) are AWS's internal unique *resource*
-  identifiers — the same kind of thing as a database primary key, sharing
-  this format by convention, not a secret. A `AROA...`/`AIDA...`/etc.
-  string appearing in an IAM policy `Condition` block (a documented,
-  normal usage — see the AWS reference above) will fire this rule despite
-  not being sensitive. This was true of this pattern from the project's
-  first commit and had never been checked against AWS's own prefix table
-  until this doc was written.
+  key ID — real secrets. This pattern originally also matched six other
+  prefixes sharing the same 4-letter+16-character shape (`AGPA` user
+  group, `AIDA` IAM user, `AIPA` EC2 instance profile, `ANPA` managed
+  policy, `ANVA` managed policy version, `AROA` role) that are AWS's
+  internal *resource* identifiers, not credentials — the same kind of
+  thing as a database primary key, sharing this format by convention. A
+  `AROA...`/`AIDA...`/etc. string appearing in an IAM policy `Condition`
+  block (a documented, normal usage — see the AWS reference above) fired
+  this rule despite not being sensitive. Fixed by narrowing the pattern
+  to just `AKIA`/`ASIA` — `tests/test_detectors.py`'s
+  `test_aws_access_key_id_negative_resource_id_prefixes` covers the
+  regression.
 - **Known false negative**: prefixes not in this set (`ABIA` bearer
   tokens, `ACCA` context-specific credentials, `APKA` public keys, `ASCA`
   certificates — also from the same AWS reference) aren't matched at all.

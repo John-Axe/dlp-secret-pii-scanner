@@ -66,7 +66,13 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="aws_access_key_id",
         name="AWS Access Key ID",
         severity="high",
-        pattern=re.compile(r"\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b"),
+        # AKIA (long-term access key) and ASIA (temporary/STS access key)
+        # only - AWS's other unique-ID prefixes sharing this 4-letter+16-char
+        # shape (AGPA/AIDA/AIPA/ANPA/ANVA/AROA) are non-secret resource
+        # identifiers (user group/IAM user/instance profile/managed policy/
+        # policy version/role), not credentials. See docs/Detectors.md and
+        # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-prefixes.
+        pattern=re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     ),
     Detector(
         rule_id="aws_secret_key",

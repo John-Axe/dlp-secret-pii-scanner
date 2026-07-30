@@ -18,6 +18,14 @@ def test_aws_access_key_id_negative():
     assert not _fires("aws_access_key_id", "this is just AKIA in prose, not a real key")
 
 
+def test_aws_access_key_id_negative_resource_id_prefixes():
+    # AGPA/AIDA/AIPA/ANPA/ANVA/AROA are AWS's own unique-ID prefixes for
+    # non-secret resources (user group/IAM user/instance profile/managed
+    # policy/policy version/role) - not credentials, and not this rule's job.
+    for prefix in ("AGPA", "AIDA", "AIPA", "ANPA", "ANVA", "AROA"):
+        assert not _fires("aws_access_key_id", f"UserId: {prefix}IOSFODNN7EXAMPLE")
+
+
 def test_aws_secret_key_positive():
     assert _fires(
         "aws_secret_key",
