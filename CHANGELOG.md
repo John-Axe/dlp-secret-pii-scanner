@@ -12,6 +12,46 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `CONTRIBUTING.md` — new "Testing philosophy" section after the existing
+  "Adding a new detector" checklist, explaining the five real test
+  categories in this repo's suite (hand-picked unit fixtures,
+  Hypothesis property-based tests, atheris fuzz testing, the benchmark
+  as a CI-gated regression gate, the performance smoke test) and what
+  distinct failure mode each one catches that the others don't.
+
+### Fixed
+- `CONTRIBUTING.md`'s "Before you write code" section referenced
+  `docs/Design-Decisions.md` as a design-decisions record "once it
+  exists" — Phase 5 explicitly decided not to write that file, since it
+  would duplicate `docs/adr/`. Updated to point at the actual ADRs
+  instead of a file that was deliberately never created.
+- `docs/Benchmark-Methodology.md` — the mechanics behind the README's
+  benchmark numbers, not a restatement of the result. Documents corpus
+  construction and labeling, and quotes `run_benchmark.py`'s exact
+  grading algorithm: per-`(file, rule_id)` pair via set difference, with
+  the real interpretive consequence spelled out for the first time — a
+  file with three planted instances of the same secret type, all caught,
+  contributes exactly one true positive for that rule, not three. Also
+  documents the precision/recall/F1 zero-division edge cases as actually
+  implemented, and what the benchmark explicitly does not measure
+  (real-world generalization, match-level recall within a file, runtime
+  performance).
+- `docs/Detectors.md` — a rule-by-rule reference for all 11 detectors:
+  exact regex quoted from `detectors.py`, validator logic explained (Luhn,
+  SSN structural rules), and known false-positive/false-negative shape
+  grounded in `tests/test_detectors.py` and this project's own benchmark.
+  Two prefix-based detectors' claims were checked directly against the
+  vendor's current documentation rather than assumed, surfacing two real,
+  previously-undocumented gaps: `aws_access_key_id` matches 8 AWS unique-
+  ID prefixes but only 2 (`AKIA`, `ASIA`) are actual credentials — the
+  other 6 (`AGPA`/`AIDA`/`AIPA`/`ANPA`/`ANVA`/`AROA`) are AWS's internal
+  resource-identifier prefixes (user group, IAM user, instance profile,
+  managed policy, policy version, role), not secrets; and `github_token`
+  doesn't match GitHub's `github_pat_`-prefixed fine-grained personal
+  access tokens at all, only the five classic `gh[pousr]_` formats.
+  `private_key_block` similarly doesn't match PKCS#8's algorithm-prefix-
+  free `-----BEGIN PRIVATE KEY-----` header. None of these are bugs to
+  fix in this pass — they're real, now-documented coverage facts.
 - `docs/FAQ.md` — genuinely new synthesis, not restated from
   `Limitations.md`/the ADRs: why this tool detects secrets and PII
   together rather than as two separate tools (grounded in `detectors.py`
