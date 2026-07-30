@@ -12,4 +12,5 @@ venv/
 htmlcov/
 /coverage.json
 .ruff_cache/
+.hypothesis/
 findings.jsonl

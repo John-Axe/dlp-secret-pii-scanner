@@ -41,6 +41,11 @@ added in the same PR as the change it describes.
   highest-severity findings kept when over the cap) and retries a detected
   GitHub rate limit (429, or a 403 carrying `Retry-After`/exhausted
   `X-RateLimit-Remaining`) with GitHub-directed backoff, up to 3 attempts.
+- Property-based tests (`hypothesis`) for the Luhn credit-card validator, the
+  SSN validator, and Shannon entropy — generated inputs alongside the existing
+  hand-picked examples, covering invariants like "any single-digit corruption
+  of a valid card number is always rejected" and "entropy is invariant under
+  shuffling" that example-based tests don't naturally reach.
 
 ### Fixed
 - Two silent-failure paths in `scan_file` — a file over 5MB and a file that
@@ -54,6 +59,11 @@ added in the same PR as the change it describes.
   rate-limit-aware (see Added, above); a genuine permissions error (a bare
   403) still raises immediately rather than being retried into a slower,
   more confusing failure.
+- `DEFAULT_SKIP_DIRS` didn't include `.hypothesis` or `.ruff_cache` — adopting
+  either tool caused `dlp-scan .` to walk into their cache internals and flag
+  cached bytes as high-entropy findings (discovered by this repo self-scanning
+  itself right after adopting `hypothesis`). Fixed at the source in `scanner.py`
+  so this doesn't recur for any project that adopts either tool, not just this one.
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).

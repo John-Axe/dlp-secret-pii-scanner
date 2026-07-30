@@ -248,6 +248,22 @@ def test_fingerprint_stable_across_line_number_changes(tmp_path):
     assert fp1 == fp2
 
 
+@pytest.mark.parametrize(
+    "skip_dir", ["node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", ".hypothesis"]
+)
+def test_scan_paths_skips_default_skip_dirs(tmp_path: Path, skip_dir: str):
+    nested = tmp_path / skip_dir / "sub"
+    nested.mkdir(parents=True)
+    (nested / "secret.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    (tmp_path / "app.py").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    findings = scan_paths([tmp_path])
+
+    files_with_findings = {f.file for f in findings}
+    assert not any(skip_dir in f for f in files_with_findings)
+    assert any("app.py" in f for f in files_with_findings)
+
+
 def test_scan_file_skips_symlinks(tmp_path):
     real = tmp_path / "real.txt"
     real.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
