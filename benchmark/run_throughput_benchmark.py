@@ -1,7 +1,8 @@
-"""Measures scan throughput (files/sec, MB/sec) against a synthetic corpus,
-generated on the fly rather than committed to the repo as fixture data -
-this is a diagnostic tool, not the accuracy benchmark (see run_benchmark.py
-for that), and doesn't need a hand-labeled ground truth.
+"""Measures scan throughput (files/sec, MB/sec) and peak process memory
+(RSS) against a synthetic corpus, generated on the fly rather than
+committed to the repo as fixture data - this is a diagnostic tool, not the
+accuracy benchmark (see run_benchmark.py for that), and doesn't need a
+hand-labeled ground truth.
 
 Deliberately NOT a CI-gating pass/fail check the way run_benchmark.py's
 precision/recall thresholds are: wall-clock throughput is machine-dependent
@@ -22,6 +23,11 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+try:
+    import resource  # POSIX-only - no stdlib equivalent on Windows.
+except ImportError:  # pragma: no cover - exercised only on a non-POSIX platform
+    resource = None  # type: ignore[assignment]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -74,6 +80,23 @@ def generate_corpus(root: Path, *, num_files: int, lines_per_file: int, seed: in
     return total_bytes, total_planted
 
 
+def peak_rss_mb() -> float | None:
+    """Process peak resident set size in MB since interpreter start, or None
+    on a platform with no `resource` module (Windows).
+
+    This is the *whole process's* peak RSS, not a scan-isolated delta - the
+    stdlib has no cheap POSIX equivalent for "memory used by just this call,"
+    so it's informative for "does memory stay bounded as corpus size grows,"
+    not a precise per-scan measurement. `ru_maxrss` units differ by platform
+    (KB on Linux, bytes on macOS) - a real, easy-to-get-wrong inconsistency,
+    normalized here rather than left to the caller.
+    """
+    if resource is None:
+        return None
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
+
+
 def run(num_files: int, lines_per_file: int, seed: int) -> dict:
     with tempfile.TemporaryDirectory(prefix="dlp-throughput-") as tmp:
         root = Path(tmp)
@@ -93,6 +116,7 @@ def run(num_files: int, lines_per_file: int, seed: int) -> dict:
         "elapsed_seconds": elapsed,
         "files_per_second": num_files / elapsed if elapsed > 0 else float("inf"),
         "mb_per_second": (total_bytes / (1024 * 1024)) / elapsed if elapsed > 0 else float("inf"),
+        "peak_rss_mb": peak_rss_mb(),
     }
 
 
@@ -111,6 +135,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Findings:         {result['findings']} (expected: {result['planted_secrets']} planted)")
     print(f"Elapsed:          {result['elapsed_seconds']:.3f}s")
     print(f"Throughput:       {result['files_per_second']:.1f} files/sec, {result['mb_per_second']:.2f} MB/sec")
+    if result["peak_rss_mb"] is not None:
+        print(
+            f"Peak RSS:         {result['peak_rss_mb']:.1f} MB (whole process since start, "
+            "not scan-isolated - see peak_rss_mb()'s docstring)"
+        )
+    else:
+        print("Peak RSS:         not measured on this platform (no `resource` module)")
     if result["findings"] != result["planted_secrets"]:
         print(
             f"\nWARNING: found {result['findings']}, planted {result['planted_secrets']} - "

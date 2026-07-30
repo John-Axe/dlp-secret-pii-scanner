@@ -12,6 +12,16 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `benchmark/run_throughput_benchmark.py` now also reports peak process
+  RSS (`resource.getrusage`, stdlib, POSIX-only — degrades to "not
+  measured on this platform" rather than crashing on Windows, no new
+  dependency). Same "not a portable claim, run it yourself" framing as
+  the existing throughput numbers. `docs/Performance.md` gets a new
+  "Memory" section with a real measured number from this session
+  (~30MB peak RSS at 3000 files) and an explicit, labeled expectation
+  (not yet independently verified with a profiler) that peak RSS should
+  track `--jobs` concurrency more than total file count, given
+  `MAX_FILE_SIZE_BYTES` already bounds any single file's in-memory size.
 - `benchmark/run_benchmark.py`: a new **N** (sample size = TP+FN) column
   in the per-rule table, so `1.00` next to `N=1` reads honestly as a
   single-example result rather than an inflated claim; a new, clearly

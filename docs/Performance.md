@@ -18,6 +18,21 @@ means something on your actual hardware — that's the whole reason this
 script exists as a separate, non-CI-gated tool rather than a single
 committed number (see its own docstring).
 
+## Memory
+
+`run_throughput_benchmark.py` also reports peak process RSS (via stdlib
+`resource.getrusage` — POSIX only, `None`/"not measured" on Windows, no
+new dependency). On this session's machine, 3000 files (~16MB): **~30MB
+peak RSS**. Same caveat as throughput — this is the whole process's peak
+since interpreter start, not a scan-isolated delta (the stdlib has no
+cheap POSIX equivalent for that), and not a portable number for your
+hardware. Consistent with `scan_file`'s own bound: `MAX_FILE_SIZE_BYTES`
+(5MB) caps how much any single file's content is held in memory at once,
+so peak RSS should track corpus width (how many files are ever open at
+once, i.e. `--jobs`) more than corpus depth (total file count) — not
+independently verified with a memory profiler in this pass, stated as an
+expectation from reading the code, not a measurement.
+
 ## What's actually CI-gated, and why it's not a throughput number
 
 `tests/test_performance_smoke.py` runs in CI on every push, but asserts a
