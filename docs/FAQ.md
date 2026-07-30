@@ -53,33 +53,48 @@ tools would mean maintaining two copies of the CLI, config loading, CI
 integration, and benchmark infrastructure around one mechanism that
 doesn't actually branch on the distinction anywhere it matters.
 
-## How do I know the 94% precision / 100% recall numbers aren't cherry-picked?
+## How do I know the precision/recall numbers aren't cherry-picked?
 
 Reasonable skepticism — a self-reported accuracy number is easy to
-exaggerate. Three things make this one checkable rather than a bare claim:
+exaggerate. Three things make this one checkable rather than a bare claim
+— including one place this project's own claim was too strong and has
+since been corrected, which is itself part of the answer:
 
 - **It's re-run in CI on every push to `main`**, and the shields.io badge
   at the top of the README is written by that same CI job
   (`update-badge`), not hand-typed — see
-  [`Operations.md`](Operations.md#maintenance). A stale or fabricated
-  number would require the badge and `benchmark/run_benchmark.py`'s
-  actual output to drift apart, which nothing in the pipeline allows.
+  [`Operations.md`](Operations.md#maintenance). An earlier version of
+  this FAQ entry claimed "nothing in the pipeline allows" the badge and
+  the actual benchmark output to drift apart — that turned out to be
+  overstated: the badge only regenerates on a `main`-branch push, so a
+  string of local commits that changed the corpus (real ones, in this
+  repo's own history) left `README.md`'s table and
+  `.github/badges/benchmark.json` stale until it was caught by a manual
+  audit and fixed. The actual current safeguard is narrower and more
+  honest: `tests/test_benchmark.py::test_committed_badge_matches_fresh_run`
+  regenerates a badge from the live corpus and diffs it against the
+  committed one on every `pytest` run, so a mismatch fails the same gate
+  every other change already has to pass — not a claim that drift is
+  structurally impossible, a claim that it's now actively checked for.
 - **You can re-run it yourself**: `python benchmark/run_benchmark.py`
   against `benchmark/corpus/` and `benchmark/labels.json`, both committed
   in this repo, not held back.
 - **The honest limit, named rather than hidden**: the corpus is small —
-  12 positive files, 8 negative files, per the README's own benchmark
-  section — and synthetic, written specifically so it never contains a
-  real leaked credential (see
+  see [`Benchmark-Methodology.md`](Benchmark-Methodology.md) for the
+  current file count and category breakdown — and synthetic, written
+  specifically so it never contains a real leaked credential (see
   [ADR 0003](adr/0003-regex-entropy-over-ml-classifier.md)'s Alternatives
-  section). A number this precise-looking, from a corpus this size, isn't
-  a claim about how this tool performs on the full diversity of secrets
-  that exist in the wild — it's a regression gate (CI fails below 85%
-  precision/recall) that catches an accuracy regression a code change
-  introduces, not a proof of generalization. Both things can be true: the
-  number is real and un-gamed, *and* it's measuring a smaller, curated
-  slice of the problem than "94% accurate on real-world secrets" would
-  suggest if taken out of context.
+  section, and `Benchmark-Methodology.md`'s "Threats to validity" section
+  for the fuller treatment). A precise-looking number from a corpus this
+  size isn't a claim about how this tool performs on the full diversity
+  of secrets that exist in the wild — it's a regression gate (CI fails
+  below 85% precision/recall) that catches an accuracy regression a code
+  change introduces, not a proof of generalization. Both things can be
+  true at once: the number is real and un-gamed, *and* it's measuring a
+  smaller, curated slice of the problem than a bare percentage would
+  suggest if taken out of context — which is exactly why this project
+  reports sample size (the **N** column) alongside every percentage now,
+  not just the percentage alone.
 
 ## Why zero runtime dependencies?
 
@@ -95,8 +110,10 @@ library. Full reasoning, including the one real cost this pays (no
 
 Short version: determinism (a baseline or SARIF fingerprint has to mean
 the same thing on every re-scan), a direct conflict with the
-zero-runtime-dependency decision above, and a 20-file benchmark corpus
-nowhere near large enough to train something that would generalize. Full
+zero-runtime-dependency decision above, and a benchmark corpus (see
+[`Benchmark-Methodology.md`](Benchmark-Methodology.md) for the current
+size) nowhere near large enough to train something that would
+generalize. Full
 reasoning, including the specific alternative of a classifier scoped
 narrowly to the entropy detector's one known false-positive class, is in
 [ADR 0003](adr/0003-regex-entropy-over-ml-classifier.md).

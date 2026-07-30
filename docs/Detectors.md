@@ -343,8 +343,10 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
   binary icon asset — is exactly as high-entropy as a real secret,
   because compressed/binary data *is* high-entropy by nature to a
   detector that only sees character distribution, not semantic meaning.
-  This is the project's only benchmark false positive (94% precision,
-  driven entirely by this one case) and the reason `.dlpignore`/
+  This is the project's only benchmark false positive (see
+  [`README.md`'s benchmark table](../README.md#benchmark-results) for the
+  current precision number, driven entirely by this one case) and the
+  reason `.dlpignore`/
   `# dlp-ignore` exist as the accepted workaround rather than a smarter
   entropy heuristic — see [ADR 0003](adr/0003-regex-entropy-over-ml-classifier.md)
   for why a classifier scoped to fix exactly this case was considered and

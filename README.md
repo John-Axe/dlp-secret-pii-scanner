@@ -6,7 +6,7 @@
 [![Benchmark](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/benchmark.json)](benchmark/run_benchmark.py)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/coverage.json)](CONTRIBUTING.md)
 
-**94% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
+**97% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
 PII at commit time (pre-commit hook), at PR review time (inline comments + diff-only
 checks), and at merge time (GitHub Action / Security tab), with the accuracy claim
 backed by a benchmark you can re-run yourself, not a marketing number. The benchmark

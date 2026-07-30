@@ -11,7 +11,32 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Added
+- `docs/Benchmark-Methodology.md`: a plain-English "What precision and
+  recall mean here" primer before the exact formulas, a fixture-category
+  breakdown of the corpus (straightforward/multi-rule/format-diversity/
+  edge-case positives, three sub-kinds of negatives), a "Match-level
+  diagnostics" section documenting the new N column and diagnostics
+  output (including why full planted/detected/missed match grading was
+  considered and not done — real ongoing annotation burden for a metric
+  file-level grading already substantially serves), a "Reproducibility"
+  section (Python/OS/deps/determinism/commit-SHA-citation), and a
+  "Threats to validity" section naming construct validity, selection
+  bias, small per-rule sample sizes, and the lack of an adversarial
+  corpus directly rather than leaving them implicit.
+
 ### Fixed
+- Found while updating the methodology doc above: four more places
+  restated the same stale 94%/12-positive-file numbers found in the
+  badge/README fix below — `README.md`'s top-line intro claim,
+  `docs/Detectors.md`'s entropy-detector writeup, and two spots in
+  `docs/FAQ.md` (one of which had overclaimed "nothing in the pipeline
+  allows" the badge to drift — corrected to describe what actually
+  happened and the real current safeguard, the new drift-detection
+  test, rather than a guarantee that turned out not to hold). Hardcoded
+  numbers were replaced with pointers to the authoritative source
+  (`Benchmark-Methodology.md`/`README.md`'s table) where the specific
+  figure wasn't the point, so they can't drift the same way again.
 - `.github/badges/benchmark.json` and `README.md`'s benchmark table were
   stale — both still showed 94% precision / 17 TP from before Phase 7's
   detector fixes and this phase's corpus expansion, because the only
