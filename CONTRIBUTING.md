@@ -8,9 +8,12 @@ just get bounced back for rework.
 
 For anything bigger than a typo fix or a new detector rule, open an issue first
 describing the problem and your proposed approach. This project has a narrow,
-considered scope (see [`README.md`](README.md) and, once it exists,
-[`docs/Design-Decisions.md`](docs/Design-Decisions.md)) — an issue first saves you
-from writing a PR against a change that doesn't fit that scope.
+considered scope (see [`README.md`](README.md) and [`docs/adr/`](docs/adr/) — the
+ADRs are the actual design-decisions record, e.g.
+[0001](docs/adr/0001-no-plugin-system-yet.md) on why there's no plugin system and
+[0002](docs/adr/0002-zero-runtime-dependencies.md) on why there are zero runtime
+dependencies) — an issue first saves you from writing a PR against a change that
+doesn't fit that scope.
 
 ## Local setup
 
@@ -67,6 +70,48 @@ in [`src/dlp/detectors.py`](src/dlp/detectors.py) needs, in the same PR:
 Skipping step 3 is the most common miss — the rule will work, but the benchmark table
 will silently not report on it, which defeats the point of shipping accuracy numbers
 as a first-class artifact instead of a claim.
+
+## Testing philosophy
+
+Step 4 above says "unit tests" — this is what backs that up. Five real categories
+exist in this repo's test suite, each catching a different failure mode; a PR adding
+new detection logic should think about which of these actually apply, not just add a
+unit test and stop:
+
+- **Hand-picked unit fixtures** (`tests/test_detectors.py`, most of `tests/`) — a
+  clear true positive, a clear near-miss true negative, and (per the checklist above)
+  a validator's specific reject path. Cheap, readable, and the right default for most
+  changes — but only as good as the examples chosen.
+- **Property-based tests** (`tests/test_detectors_properties.py`, via
+  [Hypothesis](https://hypothesis.readthedocs.io/)) — for the pure validation/scoring
+  functions specifically (`_luhn_ok`, `_ssn_ok`, `shannon_entropy`). These exist
+  because a validator like `_ssn_ok` encodes a *rule* ("area code `000`/`666`/`9xx` is
+  never valid"), not just a handful of examples of that rule — Hypothesis generates
+  many inputs and checks the rule holds across all of them, catching an edge case a
+  human wouldn't have thought to hand-write. Reach for this when you're adding a
+  validator with a real invariant, not for detectors that are pure pattern matching
+  with no separate accept/reject logic.
+- **Fuzz testing** (`fuzz/fuzz_scanner.py`, [atheris](https://github.com/google/atheris);
+  smoke-checked on every `pytest` run via `tests/test_fuzz_smoke.py`, run for real in
+  CI's dedicated fuzz job) — feeds arbitrary bytes at every detector to catch crashes
+  and hangs, not incorrect-but-non-crashing detection. A different failure mode than
+  anything above: a regex that's *wrong* about what it matches is a unit-test problem;
+  a regex that catastrophically backtracks on adversarial input is a fuzzing problem.
+- **The benchmark as a regression gate** (`benchmark/run_benchmark.py`, CI-gated at
+  85% precision/85% recall — see [`docs/Benchmark-Methodology.md`](docs/Benchmark-Methodology.md)
+  for exactly how it grades) — catches an *accuracy* regression across the whole
+  detector set on every change, not just whether the specific fixture you wrote still
+  passes.
+- **Performance smoke test** (`tests/test_performance_smoke.py`) — a generous ceiling
+  (10-100x normal), not a throughput target; see
+  [`docs/Performance.md`](docs/Performance.md). Exists specifically to catch a change
+  that makes a regex backtrack catastrophically (ReDoS-shaped), which nothing else in
+  this list would notice — a unit test only checks correctness on inputs you thought
+  to try, not wall-clock behavior on ones you didn't.
+
+Coverage (the 90% floor in step 3 above) is a byproduct of writing tests that map to
+these real categories, not the goal itself — see the "Before opening a PR" section's
+note on what earns a test its place.
 
 ## Code style
 

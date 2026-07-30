@@ -12,6 +12,19 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `CONTRIBUTING.md` — new "Testing philosophy" section after the existing
+  "Adding a new detector" checklist, explaining the five real test
+  categories in this repo's suite (hand-picked unit fixtures,
+  Hypothesis property-based tests, atheris fuzz testing, the benchmark
+  as a CI-gated regression gate, the performance smoke test) and what
+  distinct failure mode each one catches that the others don't.
+
+### Fixed
+- `CONTRIBUTING.md`'s "Before you write code" section referenced
+  `docs/Design-Decisions.md` as a design-decisions record "once it
+  exists" — Phase 5 explicitly decided not to write that file, since it
+  would duplicate `docs/adr/`. Updated to point at the actual ADRs
+  instead of a file that was deliberately never created.
 - `docs/Benchmark-Methodology.md` — the mechanics behind the README's
   benchmark numbers, not a restatement of the result. Documents corpus
   construction and labeling, and quotes `run_benchmark.py`'s exact
