@@ -12,6 +12,22 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Detectors.md` — a rule-by-rule reference for all 11 detectors:
+  exact regex quoted from `detectors.py`, validator logic explained (Luhn,
+  SSN structural rules), and known false-positive/false-negative shape
+  grounded in `tests/test_detectors.py` and this project's own benchmark.
+  Two prefix-based detectors' claims were checked directly against the
+  vendor's current documentation rather than assumed, surfacing two real,
+  previously-undocumented gaps: `aws_access_key_id` matches 8 AWS unique-
+  ID prefixes but only 2 (`AKIA`, `ASIA`) are actual credentials — the
+  other 6 (`AGPA`/`AIDA`/`AIPA`/`ANPA`/`ANVA`/`AROA`) are AWS's internal
+  resource-identifier prefixes (user group, IAM user, instance profile,
+  managed policy, policy version, role), not secrets; and `github_token`
+  doesn't match GitHub's `github_pat_`-prefixed fine-grained personal
+  access tokens at all, only the five classic `gh[pousr]_` formats.
+  `private_key_block` similarly doesn't match PKCS#8's algorithm-prefix-
+  free `-----BEGIN PRIVATE KEY-----` header. None of these are bugs to
+  fix in this pass — they're real, now-documented coverage facts.
 - `docs/FAQ.md` — genuinely new synthesis, not restated from
   `Limitations.md`/the ADRs: why this tool detects secrets and PII
   together rather than as two separate tools (grounded in `detectors.py`
