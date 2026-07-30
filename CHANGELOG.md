@@ -12,6 +12,13 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `-v`/`--verbose` logs the resolved scan configuration and a completion
+  summary (finding count, elapsed time) to stderr; `-q`/`--quiet` suppresses
+  the skipped-files stderr notice too. Neither affects stdout findings
+  output or the exit code — logging only. Uses a named `dlp` logger, not the
+  root logger, and never configures handlers outside the CLI entry point
+  (`main()`) — the `dlp` package's modules stay safely importable as a
+  library without side-effecting a consumer's own logging setup.
 - `docs/adr/` — Architecture Decision Records, starting with
   [0001](docs/adr/0001-no-plugin-system-yet.md): why detectors stay a
   hardcoded list rather than growing a plugin/entry-point system, grounded

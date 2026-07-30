@@ -101,7 +101,7 @@ Two mechanisms, same as `.gitignore` muscle memory:
   *.lock
   ```
 
-## Upgrades: SARIF, PR comments, diff-only/baseline, live badge, config file, parallel scanning
+## Upgrades: SARIF, PR comments, diff-only/baseline, live badge, config file, parallel scanning, logging
 
 ### 1. SARIF output + GitHub Security tab
 
@@ -218,6 +218,18 @@ and `ScanStats` totals — is identical to `--jobs 1` for the same input; only
 wall-clock time differs. Mainly worth it for a full-repo scan; a small
 `--diff-only` PR check has too few files for process-pool startup cost to
 pay for itself.
+
+### 7. `-v`/`--verbose` and `-q`/`--quiet`
+
+Default output is unchanged from before these flags existed: findings on
+stdout, and a stderr notice only if files were skipped (see above). `-v`
+additionally logs the resolved scan configuration (format, fail-on, entropy
+threshold, job count, whether a config file was loaded) and a completion
+summary (finding count, elapsed time) to stderr; `-vv` doesn't add more
+today but is accepted for forward compatibility. `-q` suppresses the
+skipped-files stderr notice too — findings output and the exit code are
+never affected by either flag, only stderr logging. `-q` wins if both are
+given, regardless of order.
 
 ## Usage
 

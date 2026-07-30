@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 from . import __version__, baseline, config, diff, report, severity
 from .scanner import DEFAULT_ENTROPY_THRESHOLD, ScanStats, scan_paths
 from .shared_finding import write_shared_findings_jsonl
+
+# A named, not root, logger - a library (which dlp's own modules are meant
+# to be importable as, see docs/adr/0001) must never configure logging
+# handlers at import time, only an application/CLI entry point may. This
+# module IS that entry point; scanner.py/detectors.py/etc. never touch
+# logging at all, by design.
+LOGGER = logging.getLogger("dlp")
 
 # Hardcoded fallback for each config-eligible flag, used only when neither
 # the CLI nor pyproject.toml's [tool.dlp] supplied a value. Kept as one
@@ -33,6 +42,7 @@ examples:
   dlp-scan . --write-baseline .dlp-baseline.json     # snapshot current findings
   dlp-scan --diff-only --base-ref origin/main \\
     --baseline .dlp-baseline.json --fail-on high     # only new findings can fail a PR
+  dlp-scan . --jobs 0 -v                             # parallel scan, log config + timing
 
 exit codes:
   0  no finding met --fail-on (or --fail-on none)
@@ -49,6 +59,35 @@ config file:
 
   A CLI flag always overrides the config file. --no-config ignores it entirely.
 """
+
+
+def _configure_logging(*, verbosity: int, quiet: bool) -> None:
+    """Wires a stderr handler with a level driven by -v/-q.
+
+    Default (neither flag) is WARNING - unchanged from before --verbose/
+    --quiet existed, since the only thing that ever logged before this was
+    the stderr skip-summary (see main()), which is warning-severity by
+    nature: something didn't get scanned. -q raises the bar to ERROR
+    (silences the skip-summary too); each -v lowers it, INFO then DEBUG.
+    Idempotent - safe to call more than once (e.g. across tests in the same
+    process) since it clears any handler it previously added rather than
+    accumulating duplicates.
+    """
+    if quiet:
+        level = logging.ERROR
+    elif verbosity >= 2:
+        level = logging.DEBUG
+    elif verbosity == 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("dlp-scan: %(message)s"))
+    LOGGER.handlers.clear()
+    LOGGER.addHandler(handler)
+    LOGGER.setLevel(level)
+    LOGGER.propagate = False  # don't also hand records to the root logger
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -152,6 +191,21 @@ def build_parser() -> argparse.ArgumentParser:
         "time differs. Mainly worth it for a full-repo scan, not a small "
         "--diff-only PR check where process-pool startup cost dominates.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Log the resolved scan configuration and a completion summary to "
+        "stderr. Repeat for more detail (-vv).",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress the stderr skipped-files notice. Findings output (stdout) and "
+        "the exit code are never affected by this flag, only stderr logging.",
+    )
     return parser
 
 
@@ -172,14 +226,25 @@ def _resolve_settings(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _configure_logging(verbosity=args.verbose, quiet=args.quiet)
+    start_time = time.perf_counter()
 
     try:
         cfg = {} if args.no_config else config.load_config()
     except ValueError as exc:
-        print(f"dlp-scan: {exc}", file=sys.stderr)
+        LOGGER.error(str(exc))
         return 1
     settings = _resolve_settings(args, cfg)
     jobs = (os.cpu_count() or 1) if args.jobs <= 0 else args.jobs
+
+    LOGGER.info(
+        "format=%s fail_on=%s entropy_threshold=%s jobs=%d%s",
+        settings["format"],
+        settings["fail_on"],
+        settings["entropy_threshold"],
+        jobs,
+        " (config file loaded)" if cfg else "",
+    )
 
     stats = ScanStats()
 
@@ -207,22 +272,26 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if stats.total_skipped:
-        # stderr, deliberately, and only when something was actually skipped:
-        # --format json/sarif's stdout is a machine-readable contract that
-        # can't carry an extra line, and a summary on every ordinary run
-        # (the common case, zero skips) would just be noise CI logs don't
-        # need. This is specifically about making a *skip* visible, not
-        # general scan telemetry - see the engineering audit for why a
-        # silent skip (a >5MB file, an unreadable file) matters for a tool
-        # whose job is finding things that shouldn't be missed.
-        print(
-            f"dlp-scan: {stats.total_skipped} file(s) skipped and NOT scanned "
-            f"({stats.files_skipped_too_large} too large, "
-            f"{stats.files_skipped_binary} binary, "
-            f"{stats.files_skipped_unreadable} unreadable) "
-            f"-- {stats.files_scanned} file(s) scanned successfully",
-            file=sys.stderr,
+        # WARNING, not INFO: shown by default (unless -q), deliberately, and
+        # only when something was actually skipped - a summary on every
+        # ordinary run (the common case, zero skips) would just be noise CI
+        # logs don't need. This is specifically about making a *skip*
+        # visible, not general scan telemetry - see the engineering audit
+        # for why a silent skip (a >5MB file, an unreadable file) matters
+        # for a tool whose job is finding things that shouldn't be missed.
+        LOGGER.warning(
+            "%d file(s) skipped and NOT scanned (%d too large, %d binary, "
+            "%d unreadable) -- %d file(s) scanned successfully",
+            stats.total_skipped,
+            stats.files_skipped_too_large,
+            stats.files_skipped_binary,
+            stats.files_skipped_unreadable,
+            stats.files_scanned,
         )
+
+    LOGGER.info(
+        "scan complete: %d finding(s) in %.2fs", len(findings), time.perf_counter() - start_time
+    )
 
     if args.write_baseline:
         baseline.write_baseline(args.write_baseline, findings)
