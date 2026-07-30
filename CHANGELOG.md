@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/adr/0002-zero-runtime-dependencies.md` — retroactive ADR for
+  `dependencies = []`, present unchanged since the project's first commit
+  (`f99d4ae`). Names the concrete stdlib substitutes already in place
+  (`urllib.request` over `requests`, `argparse` over `click`/`typer`,
+  hand-rolled table output over `rich`, `tomllib` over a TOML library) and
+  the one real cost this has: `[tool.dlp]` config support is unavailable
+  on Python 3.10 (`tomllib` is 3.11+), a documented no-op rather than a
+  shim.
 - `docs/Troubleshooting.md` — symptom-to-fix guidance for the specific
   problems most likely to actually come up (a missed secret, `--jobs`
   making a small scan slower, `[tool.dlp]` seemingly not applying, the
