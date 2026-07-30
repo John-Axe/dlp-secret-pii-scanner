@@ -12,6 +12,17 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/adr/0004-finding-fingerprint-design.md` — retroactive ADR
+  formalizing `Finding.fingerprint`'s existing docstring reasoning.
+  Documents why the fingerprint hashes `redacted` rather than the raw
+  matched text (the raw text is never stored on `Finding` at all — it's
+  redacted at construction time in `scanner.py`, by design), and names a
+  real, previously-undocumented collision case: two distinct short
+  secrets (≤8 chars) on the same file/rule both redact to an
+  identical fixed-length string of `*`, so they collide to the same
+  fingerprint. `cli.py`'s `--write-baseline` summary already counts
+  distinct fingerprints rather than assuming one-per-finding, so this
+  was already accounted for in behavior, just not written down.
 - `docs/adr/0003-regex-entropy-over-ml-classifier.md` — retroactive ADR for
   why detection stays regex + Shannon entropy rather than a trained
   classifier. Weighs a classifier option narrowly scoped to replace just
