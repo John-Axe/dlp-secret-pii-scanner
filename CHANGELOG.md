@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Operations.md` — practical running/upgrading/maintenance guidance
+  for all three distribution paths, including two details not written
+  down anywhere else: pre-commit's own `types: [text]` filtering runs
+  *before* `dlp-scan`'s own binary detection (two independent mechanisms,
+  not one), and pre-commit invokes `dlp-scan` against specific staged file
+  paths, not a directory scan. Explicitly notes that `v0.1.0` is the only
+  tagged release and everything in this engineering pass is still
+  `[Unreleased]` — a version-pinned consumer doesn't have any of it yet.
 - `docs/Architecture.md` — a component diagram of the actual module
   dependency graph (extracted with `grep` from real `from .` imports, not
   inferred from module names — confirms no circular imports), a sequence
