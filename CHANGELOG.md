@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Troubleshooting.md` — symptom-to-fix guidance for the specific
+  problems most likely to actually come up (a missed secret, `--jobs`
+  making a small scan slower, `[tool.dlp]` seemingly not applying, the
+  `Unknown key(s)` config error, `dlp-scan: command not found`, pre-commit
+  vs. manual scan discrepancies, a `--jobs` OS-level process-creation
+  error on restricted environments) rather than a generic FAQ. Completes
+  Phase 4 — all six planned docs (`Limitations`, `Threat-Model`,
+  `Architecture`, `Operations`, `Performance`, `Troubleshooting`) now exist.
 - `docs/Performance.md` — this session's measured throughput numbers,
   framed explicitly as machine-specific rather than a portable claim; why
   the CI-gated smoke test asserts a generous ceiling instead of a
