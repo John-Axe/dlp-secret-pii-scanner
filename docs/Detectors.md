@@ -188,26 +188,30 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `private_key_block` — Private Key Block
 
 - **Severity**: `critical`
-- **Pattern**: `-----BEGIN (?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY-----`
+- **Pattern**: `-----BEGIN (?:(?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY|(?:ENCRYPTED )?PRIVATE KEY)-----`
 - **Detection strategy**: PEM-format private key headers are a fixed,
   unambiguous string — no shape-guessing needed, the header line itself
-  *is* the signal. Covers RSA, EC, OpenSSH, DSA, and PGP key types (the
-  optional space handles both `OPENSSH PRIVATE KEY` and the
-  no-space-variant header forms).
+  *is* the signal. Two alternatives: algorithm-prefixed headers (RSA, EC,
+  OpenSSH, DSA, PGP — the optional space handles both `OPENSSH PRIVATE
+  KEY` and the no-space-variant header forms), and PKCS#8 (RFC 5958)
+  headers, which carry no algorithm name at all — `PRIVATE KEY` alone, or
+  `ENCRYPTED PRIVATE KEY` for the encrypted variant.
+- **Fixed gap, previously false-negative**: this rule originally only
+  matched the algorithm-prefixed alternative — a bare
+  `-----BEGIN PRIVATE KEY-----` (PKCS#8 unencrypted, a common `openssl <!-- # dlp-ignore -->
+  genpkey` output format) or `-----BEGIN ENCRYPTED PRIVATE KEY-----` <!-- # dlp-ignore -->
+  passed through completely undetected, since neither contains any of the
+  five algorithm words the original pattern required. Fixed by adding a
+  second alternative for the algorithm-prefix-free PKCS#8 forms.
+  `test_private_key_block_pkcs8_unencrypted_positive` and
+  `_encrypted_positive` cover the regression.
 - **Known false positive**: essentially none by construction — this
   exact header string appearing anywhere means a private key block
   follows; there's no ambiguous case a validator would need to rule out.
 - **Known false negative**: `test_private_key_block_public_key_negative`
   documents the deliberate one — `-----BEGIN RSA PUBLIC KEY-----` (a
   *public* key, safe to share) correctly does not match, since the
-  pattern requires the literal word `PRIVATE`. Key types not in the
-  four-way alternation (e.g. an `EC PRIVATE KEY` is covered, but a
-  raw `-----BEGIN PRIVATE KEY-----` with no algorithm prefix — the
-  PKCS#8 unencrypted format — is **not** matched by this pattern, since
-  the regex requires one of the four listed algorithm words before
-  `PRIVATE KEY`). This is a real, previously-undocumented gap: PKCS#8
-  keys (a common `openssl genpkey` output format) without an algorithm
-  prefix in the header line pass through undetected.
+  pattern requires the literal word `PRIVATE`.
 - **Why `critical`**: a private key is immediately, directly usable —
   same tier as `aws_secret_key`.
 

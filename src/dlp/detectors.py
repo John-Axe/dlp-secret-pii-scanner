@@ -114,7 +114,13 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="private_key_block",
         name="Private Key Block",
         severity="critical",
-        pattern=re.compile(r"-----BEGIN (?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY-----"),
+        # Algorithm-prefixed PEM headers (RSA/EC/OpenSSH/DSA/PGP), plus
+        # PKCS#8 (RFC 5958), which has no algorithm prefix - both the
+        # unencrypted ("BEGIN PRIVATE KEY") and encrypted
+        # ("BEGIN ENCRYPTED PRIVATE KEY") forms, e.g. openssl genpkey output.
+        pattern=re.compile(
+            r"-----BEGIN (?:(?:RSA|EC|OPENSSH|DSA|PGP) ?PRIVATE KEY|(?:ENCRYPTED )?PRIVATE KEY)-----"
+        ),
     ),
     Detector(
         rule_id="generic_password",

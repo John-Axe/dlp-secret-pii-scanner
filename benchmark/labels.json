@@ -11,6 +11,7 @@
   "positives/pii_email.txt": ["email"],
   "positives/pii_ssn.txt": ["us_ssn"],
   "positives/private_key.pem": ["private_key_block"],
+  "positives/private_key_pkcs8.pem": ["private_key_block"],
   "positives/slack_token.txt": ["slack_token"],
   "negatives/clean_code.py": [],
   "negatives/clean_config.yaml": [],

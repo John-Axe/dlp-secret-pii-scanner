@@ -228,3 +228,11 @@ def test_shannon_entropy_empty_string():
 
 def test_private_key_block_public_key_negative():
     assert not _fires("private_key_block", "-----BEGIN RSA PUBLIC KEY-----")
+
+
+def test_private_key_block_pkcs8_unencrypted_positive():
+    assert _fires("private_key_block", "-----BEGIN PRIVATE KEY-----")
+
+
+def test_private_key_block_pkcs8_encrypted_positive():
+    assert _fires("private_key_block", "-----BEGIN ENCRYPTED PRIVATE KEY-----")

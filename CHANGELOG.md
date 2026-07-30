@@ -12,6 +12,15 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Fixed
+- `private_key_block` only matched algorithm-prefixed PEM headers (RSA,
+  EC, OpenSSH, DSA, PGP) — PKCS#8 (RFC 5958) headers, which carry no
+  algorithm name at all, weren't matched: a bare `-----BEGIN PRIVATE
+  KEY-----` (a common `openssl genpkey` output) or `-----BEGIN ENCRYPTED
+  PRIVATE KEY-----` passed through completely undetected. Added both as
+  a second pattern alternative, with unit tests and a new benchmark
+  fixture (`benchmark/corpus/positives/private_key_pkcs8.pem`). Updated
+  the README's detector list to mention PKCS#8. Benchmark precision
+  improved 94.74% → 95.00%.
 - `github_token` only matched the five classic token prefixes
   (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`) — GitHub's fine-grained personal
   access tokens (`github_pat_` prefix) weren't matched at all. Added
@@ -70,8 +79,9 @@ added in the same PR as the change it describes.
   doesn't match GitHub's `github_pat_`-prefixed fine-grained personal
   access tokens at all, only the five classic `gh[pousr]_` formats.
   `private_key_block` similarly doesn't match PKCS#8's algorithm-prefix-
-  free `-----BEGIN PRIVATE KEY-----` header. None of these are bugs to
-  fix in this pass — they're real, now-documented coverage facts.
+  free header. None of these were fixed in this pass (docs-only scope) —
+  see the `Fixed` entries above from the follow-up pass that closed all
+  three.
 - `docs/FAQ.md` — genuinely new synthesis, not restated from
   `Limitations.md`/the ADRs: why this tool detects secrets and PII
   together rather than as two separate tools (grounded in `detectors.py`
