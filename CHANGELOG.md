@@ -12,6 +12,53 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/FAQ.md` — genuinely new synthesis, not restated from
+  `Limitations.md`/the ADRs: why this tool detects secrets and PII
+  together rather than as two separate tools (grounded in `detectors.py`
+  and `shared_finding.py` — the secret/PII distinction exists only as a
+  five-entry lookup table at the ecosystem-export boundary, nowhere else
+  in the pipeline), how to check the benchmark's 94%/100% numbers aren't
+  cherry-picked (CI-enforced, self-reproducible, with the corpus's own
+  small/synthetic size named as a real limit on what the number actually
+  proves), and how this tool positions against gitleaks/detect-secrets
+  (different scope — working tree vs. git history — not a replacement,
+  which is exactly why this repo runs gitleaks in its own CI too). Two
+  short entries point to ADR 0002/0003 rather than restating them.
+- `docs/Roadmap.md` — the five-phase engineering pass laid out as a real,
+  linkable record: every commit from Phases 1-4 tabulated by phase, and
+  Phase 5's own scope decision (three of six original candidate docs
+  skipped — `Design-Decisions.md`, `Case-Study.md`, `Development-Log.md`
+  — as substantial duplicates of `docs/adr/` and this pass's own commit
+  history) named explicitly rather than left implicit. Closes out the
+  "worth doing since it doesn't exist as a file anywhere yet" item from
+  `NEXT_SESSION.md`'s Phase 5 assessment.
+- `docs/adr/0004-finding-fingerprint-design.md` — retroactive ADR
+  formalizing `Finding.fingerprint`'s existing docstring reasoning.
+  Documents why the fingerprint hashes `redacted` rather than the raw
+  matched text (the raw text is never stored on `Finding` at all — it's
+  redacted at construction time in `scanner.py`, by design), and names a
+  real, previously-undocumented collision case: two distinct short
+  secrets (≤8 chars) on the same file/rule both redact to an
+  identical fixed-length string of `*`, so they collide to the same
+  fingerprint. `cli.py`'s `--write-baseline` summary already counts
+  distinct fingerprints rather than assuming one-per-finding, so this
+  was already accounted for in behavior, just not written down.
+- `docs/adr/0003-regex-entropy-over-ml-classifier.md` — retroactive ADR for
+  why detection stays regex + Shannon entropy rather than a trained
+  classifier. Weighs a classifier option narrowly scoped to replace just
+  the entropy detector (the source of this project's one benchmark false
+  positive) against the same detector's determinism/explainability
+  guarantees, the zero-runtime-dependency decision in ADR 0002, and the
+  benchmark corpus's actual size (20 files — nowhere near enough to train
+  a generalizable model).
+- `docs/adr/0002-zero-runtime-dependencies.md` — retroactive ADR for
+  `dependencies = []`, present unchanged since the project's first commit
+  (`f99d4ae`). Names the concrete stdlib substitutes already in place
+  (`urllib.request` over `requests`, `argparse` over `click`/`typer`,
+  hand-rolled table output over `rich`, `tomllib` over a TOML library) and
+  the one real cost this has: `[tool.dlp]` config support is unavailable
+  on Python 3.10 (`tomllib` is 3.11+), a documented no-op rather than a
+  shim.
 - `docs/Troubleshooting.md` — symptom-to-fix guidance for the specific
   problems most likely to actually come up (a missed secret, `--jobs`
   making a small scan slower, `[tool.dlp]` seemingly not applying, the
