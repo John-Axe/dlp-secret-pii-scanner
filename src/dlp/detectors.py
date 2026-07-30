@@ -86,7 +86,11 @@ REGEX_DETECTORS: list[Detector] = [
         rule_id="github_token",
         name="GitHub Token",
         severity="high",
-        pattern=re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36}\b"),
+        # Classic tokens (ghp_/gho_/ghu_/ghs_/ghr_, 36 chars) plus
+        # fine-grained personal access tokens (github_pat_, 82 chars -
+        # format verified against gitleaks' public config, since GitHub's
+        # own docs state the prefix but not the exact length/charset).
+        pattern=re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_\w{82})\b"),
     ),
     Detector(
         rule_id="gitlab_token",

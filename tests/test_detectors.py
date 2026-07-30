@@ -212,6 +212,16 @@ def test_github_token_ghr_prefix():
     assert _fires("github_token", 'token = "ghr_00000000000000000000000000000000000A"')
 
 
+def test_github_token_fine_grained_pat_positive():
+    token = "github_pat_" + "0" * 81 + "A"  # github_pat_ + 82 chars, per gitleaks' pattern
+    assert _fires("github_token", f'token = "{token}"')
+
+
+def test_github_token_fine_grained_pat_negative_wrong_length():
+    token = "github_pat_" + "0" * 80 + "A"  # one char short of 82
+    assert not _fires("github_token", f'token = "{token}"')
+
+
 def test_shannon_entropy_empty_string():
     assert detectors.shannon_entropy("") == 0.0
 

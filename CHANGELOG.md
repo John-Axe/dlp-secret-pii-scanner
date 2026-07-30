@@ -12,6 +12,17 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Fixed
+- `github_token` only matched the five classic token prefixes
+  (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`) — GitHub's fine-grained personal
+  access tokens (`github_pat_` prefix) weren't matched at all. Added
+  `github_pat_\w{82}` as a second alternative; the exact length/charset
+  was verified against gitleaks' public detection config (GitHub's own
+  docs confirm the prefix but not the length). New benchmark fixture
+  (`benchmark/corpus/positives/github_fine_grained_pat.py`) and two unit
+  tests (`test_github_token_fine_grained_pat_positive`,
+  `_negative_wrong_length`). Benchmark precision improved slightly
+  (94.44% → 94.74%) since the new true positive outweighs the unchanged
+  false positive count.
 - `aws_access_key_id` matched 8 AWS unique-ID prefixes but only 2 (`AKIA`,
   `ASIA`) are actual credentials — the other 6 (`AGPA`/`AIDA`/`AIPA`/
   `ANPA`/`ANVA`/`AROA`, verified against AWS's own IAM unique-identifier

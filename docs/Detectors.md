@@ -95,20 +95,26 @@ detectors (no decoding/de-obfuscation, no cross-file correlation).
 ## `github_token` — GitHub Token
 
 - **Severity**: `high`
-- **Pattern**: `\bgh[pousr]_[A-Za-z0-9]{36}\b`
-- **Detection strategy**: matches GitHub's five classic token prefixes in
-  one pattern via the `[pousr]` character class.
+- **Pattern**: `\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_\w{82})\b`
+- **Detection strategy**: matches GitHub's five classic token prefixes via
+  the `[pousr]` character class, plus fine-grained personal access tokens
+  (`github_pat_` + 82 characters) as a second alternative.
 - **Verified prefix meanings** (per [GitHub's own docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github)):
   `ghp_` personal access token (classic), `gho_` OAuth access token,
   `ghu_` GitHub App user access token, `ghs_` GitHub App installation
   access token, `ghr_` GitHub App refresh token — `tests/test_detectors.py`
   has a positive test for each of the five
   (`test_github_token_gho_prefix` etc.).
-- **Known false negative, verified against GitHub's own docs**: **fine-
-  grained personal access tokens use the `github_pat_` prefix**, a
-  different format entirely, introduced after this project's classic-only
-  pattern was written — this rule does not match them at all. This is a
-  real, previously-undocumented coverage gap, not a hypothetical one.
+- **Fine-grained PAT support, added after a real gap was found**: this
+  rule originally only matched the five classic prefixes above. GitHub's
+  own docs confirm fine-grained personal access tokens use a different
+  `github_pat_` prefix but don't publish the exact length/charset; the
+  `github_pat_\w{82}` shape was verified against
+  [gitleaks](https://github.com/gitleaks/gitleaks)'s public detection
+  config (`github_pat_\w{82}`, identical) rather than assumed. Covered by
+  `test_github_token_fine_grained_pat_positive` and
+  `test_github_token_fine_grained_pat_negative_wrong_length` (confirming
+  the length is exact, not a minimum).
 - **Known false positive**: `test_github_token_negative` — prose
   mentioning a URL like `github.com/ghp_examples` doesn't match, since
   the literal text after `ghp_` isn't 36 alphanumeric characters, but any
