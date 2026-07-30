@@ -11,6 +11,18 @@ added in the same PR as the change it describes.
 
 ## [Unreleased]
 
+### Fixed
+- `.github/badges/benchmark.json` and `README.md`'s benchmark table were
+  stale — both still showed 94% precision / 17 TP from before Phase 7's
+  detector fixes and this phase's corpus expansion, because the only
+  thing that regenerates the badge is CI's main-branch push job, which
+  has never run (nothing's been pushed yet), and `CONTRIBUTING.md`'s
+  "regenerate the badge when you touch the corpus" step had no automated
+  check behind it. Regenerated both to the real current numbers (97.14%
+  precision, 34 TP) and added `test_committed_badge_matches_fresh_run`
+  (`tests/test_benchmark.py`) so this specific drift is now caught by
+  `pytest` on every commit, not just eventually by a main-branch push.
+
 ### Added
 - `benchmark/run_throughput_benchmark.py` now also reports peak process
   RSS (`resource.getrusage`, stdlib, POSIX-only — degrades to "not
