@@ -25,14 +25,20 @@ recommended.
 
 ## Before opening a PR
 
-Run everything CI runs, in this order, and don't open the PR until all four pass:
+Run everything CI runs, in this order, and don't open the PR until all six pass:
 
 ```bash
-pytest -v                                                          # 1. unit tests
-python benchmark/run_benchmark.py --min-precision 0.85 --min-recall 0.85   # 2. accuracy gate
-dlp-scan . --fail-on critical                                       # 3. self-scan
-python fuzz/fuzz_scanner.py -runs=10000                             # 4. fuzz smoke test (needs atheris)
+ruff check .                                                        # 1. lint
+mypy src/                                                           # 2. type-check (library code only, see ci.yml's comment on why)
+pytest -v --cov=dlp --cov-report=term-missing                       # 3. unit tests + coverage gate (90% floor)
+python benchmark/run_benchmark.py --min-precision 0.85 --min-recall 0.85   # 4. accuracy gate
+dlp-scan . --fail-on critical                                       # 5. self-scan
+python fuzz/fuzz_scanner.py -runs=10000                             # 6. fuzz smoke test (needs atheris)
 ```
+
+The coverage gate is a floor (90%), not a target — don't write a test just to nudge
+the percentage. A test earns its place by covering a real branch (see `--cov-report
+=term-missing`'s "Missing" column for what isn't), not by existing.
 
 If you changed anything under `benchmark/corpus/`, also re-run
 `python benchmark/run_benchmark.py --badge-output .github/badges/benchmark.json`
@@ -64,8 +70,11 @@ as a first-class artifact instead of a claim.
 
 ## Code style
 
-There's no `ruff`/`black`/`mypy` gate wired into CI yet (tracked as a known gap —
-see the maturity audit if one is present in `docs/`). Until there is, match what's
+`ruff check` and `mypy src/` (strict mode) are both CI gates — a PR that doesn't
+pass either won't merge. There's deliberately no auto-formatter (`ruff format`/
+`black`) wired in: adopting one now would reformat the entire tree in an unrelated
+diff, which is a separate decision from "does the code pass lint rules," not one
+bundled in silently. Beyond what the linter/type-checker catch, match what's
 already there:
 
 - Every public function gets a docstring. Prefer explaining a non-obvious *why* over

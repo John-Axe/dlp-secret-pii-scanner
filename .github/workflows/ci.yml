@@ -30,14 +30,34 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Run pytest
-        run: pytest -v
+      - name: Lint (ruff)
+        run: ruff check .
+
+      # Scoped to src/ deliberately, not tests/ or benchmark/: tests/test_benchmark.py
+      # imports benchmark/run_benchmark.py via a runtime sys.path trick that mypy can't
+      # resolve statically, and strict mode gives limited signal on test files that
+      # lean on pytest fixtures/monkeypatching by design. The library is what ships
+      # and what downstream consumers type-check against (see py.typed) - that's what
+      # gets the strict gate.
+      - name: Type-check (mypy, strict, src/ only)
+        run: mypy src/
+
+      - name: Run pytest with coverage
+        run: pytest -v --cov=dlp --cov-report=term-missing --cov-report=json
 
       - name: Run benchmark gate
         run: python benchmark/run_benchmark.py --min-precision 0.85 --min-recall 0.85
 
       - name: Self-scan the repository
         run: dlp-scan . --format table --fail-on critical
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-report
+          path: coverage.json
+          if-no-files-found: warn
 
   fuzz:
     runs-on: ubuntu-latest
@@ -97,6 +117,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
       - name: Install package
         run: pip install -e .
 
@@ -105,14 +128,19 @@ jobs:
           python benchmark/run_benchmark.py --min-precision 0.85 --min-recall 0.85 \
             --badge-output .github/badges/benchmark.json
 
-      - name: Commit badge if it changed
+      - name: Update coverage badge
         run: |
-          if ! git diff --quiet -- .github/badges/benchmark.json; then
+          pytest -q --cov=dlp --cov-report=json
+          python scripts/coverage_badge.py coverage.json .github/badges/coverage.json
+
+      - name: Commit badges if they changed
+        run: |
+          if ! git diff --quiet -- .github/badges/; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .github/badges/benchmark.json
-            git commit -m "chore: update benchmark precision/recall badge [skip ci]"
+            git add .github/badges/
+            git commit -m "chore: update benchmark/coverage badges [skip ci]"
             git push origin HEAD:main
           else
-            echo "Badge unchanged."
+            echo "Badges unchanged."
           fi

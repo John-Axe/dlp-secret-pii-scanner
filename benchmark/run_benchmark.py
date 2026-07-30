@@ -105,7 +105,7 @@ def render_table(results: dict) -> tuple[str, float, float, float]:
     widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(headers)]
 
     def fmt(cells: list[str]) -> str:
-        return "  ".join(cell.ljust(w) for cell, w in zip(cells, widths))
+        return "  ".join(cell.ljust(w) for cell, w in zip(cells, widths, strict=True))
 
     lines = [fmt(headers), fmt(["-" * w for w in widths])]
     lines.extend(fmt(r) for r in rows)

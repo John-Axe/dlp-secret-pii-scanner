@@ -19,7 +19,14 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "atheris>=2.3"]
+dev = [
+  "pytest>=7.0",
+  "pytest-cov>=5.0",
+  "hypothesis>=6.100",
+  "atheris>=2.3",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
 
 [project.scripts]
 dlp-scan = "dlp.cli:main"
@@ -27,5 +34,57 @@ dlp-scan = "dlp.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+dlp = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["dlp"]
+# __main__.py is only ever loaded as `__main__` in a separate subprocess
+# (test_python_dash_m_dlp_runs_as_a_module in test_cli.py) - coverage.py
+# only instruments the process it runs in, so this file always reports as
+# 0% regardless of how well it's actually tested. Its correctness is
+# proven by that subprocess test, a stronger guarantee than a line-coverage
+# percentage would give for a 2-statement delegator anyway.
+omit = ["src/dlp/__main__.py"]
+
+[tool.coverage.report]
+# Ratchet floor, not the ceiling: measured coverage the day this gate was
+# added was 96.45%. Set a few points below that (not at it) so a normal,
+# reasonably-tested new feature doesn't fail CI over rounding, while still
+# catching a real regression - raise this as coverage climbs further,
+# rather than leaving a permanently loose floor.
+fail_under = 90
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Deliberately narrow to start: pyflakes, pycodestyle, isort, and bugbear.
+# Widening this (e.g. adding pydocstyle) is a Phase 3+ decision, not bundled
+# into "turn linting on for the first time" - see the audit's Phase 2 entry.
+select = ["E", "F", "W", "I", "B"]
+ignore = [
+  "E501", # line-length is enforced by the formatter via `line-length` above,
+          # not by the linter - avoids the two disagreeing on wrapping.
+]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+# fuzz/ imports atheris, an optional dev-only dependency with no type stubs;
+# excluding it here (rather than adding a stub) keeps `mypy src/ tests/`
+# honest about what's actually type-checked.
+exclude = ["^fuzz/"]
+
+[[tool.mypy.overrides]]
+module = "fuzz.*"
+ignore_errors = true

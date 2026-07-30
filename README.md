@@ -4,6 +4,7 @@
 [![CodeQL](https://github.com/John-Axe/dlp-secret-pii-scanner/actions/workflows/codeql.yml/badge.svg)](https://github.com/John-Axe/dlp-secret-pii-scanner/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/John-Axe/dlp-secret-pii-scanner/badge)](https://securityscorecards.dev/viewer/?uri=github.com/John-Axe/dlp-secret-pii-scanner)
 [![Benchmark](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/benchmark.json)](benchmark/run_benchmark.py)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/John-Axe/dlp-secret-pii-scanner/main/.github/badges/coverage.json)](CONTRIBUTING.md)
 
 **94% precision and 100% recall on a labeled benchmark corpus** — blocks secrets and
 PII at commit time (pre-commit hook), at PR review time (inline comments + diff-only

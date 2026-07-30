@@ -25,6 +25,15 @@ added in the same PR as the change it describes.
   previously only in the README.
 - Three structured issue forms (false positive, new detector request, bug report),
   a PR template mirroring the CONTRIBUTING.md pre-PR checklist, and `CODEOWNERS`.
+- CI now runs `ruff check` and `mypy src/` (strict) as required gates, and the test
+  job enforces a 90% coverage floor (`pytest-cov`) with `--cov-report=term-missing`
+  surfacing exactly which lines aren't. `src/dlp/py.typed` (PEP 561) is added so
+  downstream consumers of the published package get type-checking benefit from it
+  too, not just this repo's own CI.
+- `scripts/coverage_badge.py` generates a shields.io coverage badge from a
+  `coverage json` report the same way `benchmark/run_benchmark.py` already
+  generates the precision/recall badge — CI regenerates and commits both on every
+  push to `main` if they changed.
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).

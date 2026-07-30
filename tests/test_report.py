@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from dlp import report
 from dlp.scanner import Finding
 

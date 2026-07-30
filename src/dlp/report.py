@@ -108,10 +108,10 @@ def to_table(findings: list[Finding], *, color: bool = False) -> str:
     widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(headers)]
 
     def fmt_row(cells: list[str]) -> str:
-        return "  ".join(cell.ljust(width) for cell, width in zip(cells, widths))
+        return "  ".join(cell.ljust(width) for cell, width in zip(cells, widths, strict=True))
 
     lines = [fmt_row(headers), fmt_row(["-" * w for w in widths])]
-    for f, row in zip(findings, rows):
+    for f, row in zip(findings, rows, strict=True):
         line = fmt_row(row)
         if color:
             c = SEVERITY_COLOR.get(f.severity, "")

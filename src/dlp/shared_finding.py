@@ -15,6 +15,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .scanner import Finding
 
@@ -55,7 +56,7 @@ def _category(rule_id: str) -> str:
     return "pii" if rule_id in _PII_RULE_IDS else "secret"
 
 
-def to_shared_finding(finding: Finding) -> dict:
+def to_shared_finding(finding: Finding) -> dict[str, Any]:
     """Map one dlp Finding onto a dict matching finding.schema.json."""
     return {
         "id": str(uuid.uuid4()),

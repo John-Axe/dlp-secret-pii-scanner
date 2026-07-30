@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+from collections.abc import Iterator
 from pathlib import Path
 
 from . import detectors, ignore
@@ -23,7 +24,7 @@ class Finding:
     severity: str
     redacted: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str | int]:
         return dataclasses.asdict(self)
 
     @property
@@ -40,7 +41,7 @@ def _is_probably_binary(data: bytes) -> bool:
     return b"\x00" in data[:8192]
 
 
-def _iter_files(root: Path, ignore_patterns: list[str], ignore_base: Path):
+def _iter_files(root: Path, ignore_patterns: list[str], ignore_base: Path) -> Iterator[Path]:
     if root.is_file():
         if root.is_relative_to(ignore_base):
             rel = root.relative_to(ignore_base).as_posix()

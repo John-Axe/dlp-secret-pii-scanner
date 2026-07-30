@@ -10,4 +10,6 @@ dist/
 venv/
 .coverage
 htmlcov/
+/coverage.json
+.ruff_cache/
 findings.jsonl

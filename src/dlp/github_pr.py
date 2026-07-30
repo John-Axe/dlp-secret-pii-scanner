@@ -14,6 +14,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 from .scanner import Finding
 
@@ -21,7 +22,7 @@ API_VERSION = "2022-11-28"
 USER_AGENT = "dlp-secret-pii-scanner"
 
 
-def build_comment_payload(finding: Finding, commit_sha: str) -> dict:
+def build_comment_payload(finding: Finding, commit_sha: str) -> dict[str, Any]:
     safe_redacted = finding.redacted.replace("`", "*")
     body = (
         f"**DLP scan: {finding.severity.upper()} — {finding.rule_name}** (`{finding.rule_id}`)\n\n"

@@ -13,6 +13,7 @@ Usage (via corpus):
 """
 
 import sys
+
 import atheris
 
 with atheris.instrument_imports():
