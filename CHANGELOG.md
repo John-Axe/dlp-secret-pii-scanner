@@ -12,6 +12,17 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Benchmark-Methodology.md` — the mechanics behind the README's
+  benchmark numbers, not a restatement of the result. Documents corpus
+  construction and labeling, and quotes `run_benchmark.py`'s exact
+  grading algorithm: per-`(file, rule_id)` pair via set difference, with
+  the real interpretive consequence spelled out for the first time — a
+  file with three planted instances of the same secret type, all caught,
+  contributes exactly one true positive for that rule, not three. Also
+  documents the precision/recall/F1 zero-division edge cases as actually
+  implemented, and what the benchmark explicitly does not measure
+  (real-world generalization, match-level recall within a file, runtime
+  performance).
 - `docs/Detectors.md` — a rule-by-rule reference for all 11 detectors:
   exact regex quoted from `detectors.py`, validator logic explained (Luhn,
   SSN structural rules), and known false-positive/false-negative shape
