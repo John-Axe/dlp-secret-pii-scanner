@@ -101,7 +101,7 @@ Two mechanisms, same as `.gitignore` muscle memory:
   *.lock
   ```
 
-## Upgrades: SARIF, PR comments, diff-only/baseline, live badge
+## Upgrades: SARIF, PR comments, diff-only/baseline, live badge, config file
 
 ### 1. SARIF output + GitHub Security tab
 
@@ -176,6 +176,29 @@ job regenerates that file on every push to `main` via
 `run_benchmark.py --badge-output .github/badges/benchmark.json` and commits it back to
 the repo only if the numbers changed - the badge is always exactly what the last
 benchmark run produced, never hand-edited.
+
+### 5. Per-project defaults in `pyproject.toml`
+
+`--format`, `--fail-on`, `--no-entropy`, `--entropy-threshold`, `--no-color`, and
+`--base-ref` can all live in a `[tool.dlp]` table instead of being repeated on
+every invocation or wrapped in a Makefile/CI step:
+
+```toml
+[tool.dlp]
+fail_on = "critical"
+entropy_threshold = 4.5
+```
+
+A CLI flag always wins over the config file; `--no-config` ignores it entirely.
+The nearest `pyproject.toml` walking up from the current directory is used, the
+same search direction `git`/`pre-commit` use. An unknown key or an invalid value
+(e.g. `fail_on = "critcal"`) fails loudly on stderr rather than being silently
+ignored - see [`CONTRIBUTING.md`](CONTRIBUTING.md) for why this project prefers
+explicit failure over silent misconfiguration. Uses Python's stdlib `tomllib`
+(3.11+) rather than adding a TOML-parsing runtime dependency; on Python 3.10
+(still within this project's supported range) config loading is a documented
+no-op, not a crash - the CLI works exactly as it always has, just without this
+one convenience.
 
 ## Usage
 

@@ -247,3 +247,56 @@ def test_cli_diff_only_with_baseline(tmp_path: Path, capsys, monkeypatch):
     findings = json.loads(capsys.readouterr().out)
 
     assert findings == []
+
+
+def test_cli_picks_up_fail_on_from_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")  # a "low"-severity finding
+
+    exit_code = main(["."])  # no --fail-on flag on the CLI at all
+
+    assert exit_code == 1  # config's fail_on=low applies; the hardcoded default (high) would give 0
+
+
+def test_cli_flag_overrides_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")
+
+    exit_code = main([".", "--fail-on", "critical"])  # explicit flag should win over config
+
+    assert exit_code == 0
+
+
+def test_cli_no_config_flag_ignores_pyproject_toml(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "note.txt").write_text("Contact: jane.doe@example.com\n")
+
+    exit_code = main([".", "--no-config"])  # falls back to the hardcoded default (high)
+
+    assert exit_code == 0
+
+
+def test_cli_reports_invalid_config_on_stderr_and_exits_nonzero(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "not-a-real-severity"\n', encoding="utf-8")
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    exit_code = main(["."])
+
+    assert exit_code == 1
+    assert "fail_on" in capsys.readouterr().err
+
+
+def test_cli_entropy_threshold_from_config_is_used(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nentropy_threshold = 8.0\n', encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("TOKEN=kQ7vXz2LpN9wTr4FbHc8Ym1Jd6Ks3EoZa5Vt\n")  # gitleaks:allow
+
+    main([".", "--format", "json", "--fail-on", "none"])
+    findings = json.loads(capsys.readouterr().out)
+
+    # threshold 8.0 is above what this token's entropy reaches, so it's never flagged
+    assert not any(f["rule_id"] == "high_entropy_string" for f in findings)

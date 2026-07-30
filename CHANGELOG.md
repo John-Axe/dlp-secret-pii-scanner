@@ -46,6 +46,12 @@ added in the same PR as the change it describes.
   hand-picked examples, covering invariants like "any single-digit corruption
   of a valid card number is always rejected" and "entropy is invariant under
   shuffling" that example-based tests don't naturally reach.
+- `pyproject.toml`'s `[tool.dlp]` table can now supply per-project defaults for
+  `--format`/`--fail-on`/`--no-entropy`/`--entropy-threshold`/`--no-color`/
+  `--base-ref`, so a team doesn't have to repeat CLI flags on every invocation.
+  CLI flags always win; `--no-config` opts out entirely. Uses stdlib `tomllib`
+  (3.11+) rather than a new runtime dependency — a documented no-op, not a
+  crash, on Python 3.10.
 
 ### Fixed
 - Two silent-failure paths in `scan_file` — a file over 5MB and a file that
