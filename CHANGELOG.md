@@ -12,6 +12,59 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Troubleshooting.md` — symptom-to-fix guidance for the specific
+  problems most likely to actually come up (a missed secret, `--jobs`
+  making a small scan slower, `[tool.dlp]` seemingly not applying, the
+  `Unknown key(s)` config error, `dlp-scan: command not found`, pre-commit
+  vs. manual scan discrepancies, a `--jobs` OS-level process-creation
+  error on restricted environments) rather than a generic FAQ. Completes
+  Phase 4 — all six planned docs (`Limitations`, `Threat-Model`,
+  `Architecture`, `Operations`, `Performance`, `Troubleshooting`) now exist.
+- `docs/Performance.md` — this session's measured throughput numbers,
+  framed explicitly as machine-specific rather than a portable claim; why
+  the CI-gated smoke test asserts a generous ceiling instead of a
+  throughput floor; and the algorithm's actual shape (every line pays the
+  cost of all 10 regex detectors plus entropy tokenization,
+  unconditionally — described from reading `scanner.py`/`detectors.py`,
+  explicitly labeled as not a profiler-measured result). Names known
+  non-optimizations (no regex pre-filtering, no `--jobs` auto-tuning, no
+  cross-run caching) directly rather than leaving them to look like
+  oversights.
+- `docs/Operations.md` — practical running/upgrading/maintenance guidance
+  for all three distribution paths, including two details not written
+  down anywhere else: pre-commit's own `types: [text]` filtering runs
+  *before* `dlp-scan`'s own binary detection (two independent mechanisms,
+  not one), and pre-commit invokes `dlp-scan` against specific staged file
+  paths, not a directory scan. Explicitly notes that `v0.1.0` is the only
+  tagged release and everything in this engineering pass is still
+  `[Unreleased]` — a version-pinned consumer doesn't have any of it yet.
+- `docs/Architecture.md` — a component diagram of the actual module
+  dependency graph (extracted with `grep` from real `from .` imports, not
+  inferred from module names — confirms no circular imports), a sequence
+  diagram of the real `pr-scan.yml` CI flow, and a deployment diagram of
+  the three ways this tool runs (CLI, pre-commit, GitHub Action). Doesn't
+  reproduce the README's existing scan-pipeline diagram (one diagram to
+  keep current, not two copies to drift apart) but does document the
+  release pipeline (SLSA/Sigstore/PyPI Trusted Publisher), which wasn't
+  written down anywhere before this — including the caveat that the PyPI
+  publish step is `continue-on-error: true` pending PyPI-side Trusted
+  Publisher configuration, not a confirmed-working claim (an earlier draft
+  of this file linked to a README section that doesn't actually discuss
+  releases at all — caught and corrected before committing, not after).
+- `docs/Threat-Model.md` — what this tool trusts (scanned-file bytes, never
+  executed; the local git binary for `--diff-only`; `GITHUB_TOKEN` for
+  exactly one purpose) versus what it doesn't (file content as adversarial
+  input, guarded by fuzzing + a performance regression test; the GitHub
+  API's response body). Verified against source while writing, not assumed
+  — confirmed via `grep` that no `shell=True`/`eval`/`exec`/`pickle` exists
+  anywhere in `src/dlp/`, and corrected an early draft that mis-attributed
+  a redaction safeguard to the wrong module before committing.
+- `docs/Limitations.md` — detection-coverage, file-size, performance, and
+  ecosystem-integration limitations consolidated in one place, plus what the
+  tool deliberately doesn't do (remediate, scan git history, verify a found
+  credential is live). Every claim grounded in the current implementation,
+  not a hedge — several were verified against actual behavior (e.g. the CI
+  workflow's fail/pass gate) while writing this, not assumed.
 - `-v`/`--verbose` logs the resolved scan configuration and a completion
   summary (finding count, elapsed time) to stderr; `-q`/`--quiet` suppresses
   the skipped-files stderr notice too. Neither affects stdout findings
