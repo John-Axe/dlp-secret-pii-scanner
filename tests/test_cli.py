@@ -300,3 +300,93 @@ def test_cli_entropy_threshold_from_config_is_used(tmp_path: Path, capsys, monke
 
     # threshold 8.0 is above what this token's entropy reaches, so it's never flagged
     assert not any(f["rule_id"] == "high_entropy_string" for f in findings)
+
+
+def test_cli_jobs_flag_finds_the_same_findings_as_sequential(tmp_path: Path, capsys):
+    (tmp_path / "creds.txt").write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+
+    main([str(tmp_path), "--jobs", "2", "--format", "json", "--fail-on", "none"])
+    findings = json.loads(capsys.readouterr().out)
+
+    assert any(f["rule_id"] == "aws_access_key_id" for f in findings)
+
+
+def test_cli_jobs_zero_resolves_to_cpu_count(tmp_path: Path, monkeypatch):
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+    monkeypatch.setattr("dlp.cli.os.cpu_count", lambda: 6)
+
+    captured_jobs = {}
+    from dlp import cli as cli_module
+
+    real_scan_paths = cli_module.scan_paths
+
+    def spying_scan_paths(*args, **kwargs):
+        captured_jobs["jobs"] = kwargs.get("jobs")
+        return real_scan_paths(*args, **kwargs)
+
+    monkeypatch.setattr(cli_module, "scan_paths", spying_scan_paths)
+
+    main([str(tmp_path), "--jobs", "0", "--fail-on", "none"])
+
+    assert captured_jobs["jobs"] == 6
+
+
+def test_cli_default_verbosity_shows_neither_config_nor_completion_log(tmp_path: Path, capsys):
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    main([str(tmp_path), "--fail-on", "none"])
+
+    assert capsys.readouterr().err == ""
+
+
+def test_cli_verbose_logs_resolved_config_and_completion_summary(tmp_path: Path, capsys):
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    main([str(tmp_path), "-v", "--fail-on", "none"])
+    err = capsys.readouterr().err
+
+    assert "format=table" in err
+    assert "fail_on=none" in err
+    assert "jobs=1" in err
+    assert "scan complete: 0 finding(s)" in err
+
+
+def test_cli_verbose_notes_when_a_config_file_was_loaded(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.dlp]\nfail_on = "low"\n', encoding="utf-8")
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    main([".", "-v", "--fail-on", "none"])
+
+    assert "config file loaded" in capsys.readouterr().err
+
+
+def test_cli_double_verbose_still_shows_info_level_output(tmp_path: Path, capsys):
+    """-vv (DEBUG) doesn't add distinct content over -v (INFO) yet - this
+    pins that -vv is still at least as verbose as -v, not accidentally
+    quieter, which the raw >= 2 comparison in _configure_logging could get
+    backwards in a future edit without a test catching it."""
+    (tmp_path / "clean.txt").write_text("nothing sensitive\n")
+
+    main([str(tmp_path), "-vv", "--fail-on", "none"])
+
+    assert "scan complete" in capsys.readouterr().err
+
+
+def test_cli_quiet_suppresses_the_skipped_files_warning(tmp_path: Path, capsys):
+    (tmp_path / "blob.bin").write_bytes(b"\x00\x01binary")
+
+    main([str(tmp_path), "-q", "--fail-on", "none"])
+
+    assert capsys.readouterr().err == ""
+
+
+def test_cli_quiet_and_verbose_together_quiet_wins(tmp_path: Path, capsys):
+    """-q raises the level to ERROR regardless of how many -v's were also
+    given - quiet is an explicit "I don't want this noise" request and
+    should not be overridable by also passing -v, whichever order."""
+    (tmp_path / "blob.bin").write_bytes(b"\x00\x01binary")
+
+    main([str(tmp_path), "-vv", "-q", "--fail-on", "none"])
+
+    assert capsys.readouterr().err == ""

@@ -1,6 +1,6 @@
 # Handoff — engineering transformation, in progress
 
-**Last updated:** 2026-07-30, end of the session that completed Phase 2.
+**Last updated:** 2026-07-30, Phase 3 complete, Phase 4 not yet started.
 **Read this file first** if you're picking this work up cold — it should let
 you continue without re-deriving anything below.
 
@@ -9,119 +9,166 @@ you continue without re-deriving anything below.
 `dlp-secret-pii-scanner` is going through a structured engineering-quality
 pass: audit → 5-phase roadmap → incremental, individually-verified PRs, each
 with its own Goal/Reasoning/Tradeoffs writeup in its commit message. Nothing
-has been pushed to `origin` or merged — everything lives on two local
-branches, one commit per coherent change, matching how this repo already
-holds PR merges for an explicit human go-ahead.
+has been pushed to `origin` or merged — everything lives on three stacked
+local branches, one commit per coherent change, matching how this repo
+already holds PR merges for an explicit human go-ahead.
 
 ## Completed work
 
 ### Phase 1 — Quick wins (branch `engineering-audit/phase-1-quick-wins`, 5 commits)
-1. `6552c88` — `CONTRIBUTING.md`
-2. `9a58a85` — `CHANGELOG.md`, backfilled from git history
-3. `7c6d026` — 3 tailored issue forms, PR template, `CODEOWNERS`
-4. `3435130` — `--version`, `python -m dlp`, worked `--help` examples
-5. `7d73713` — CHANGELOG catch-up for #3/#4
+`CONTRIBUTING.md`, `CHANGELOG.md`, issue/PR templates + `CODEOWNERS`,
+`--version`/`python -m dlp`/`--help` examples.
 
-### Phase 2 — Engineering improvements (branch `engineering-audit/phase-2-engineering-improvements`, stacked on Phase 1, 5 commits)
-1. `9ec4343` — `ruff check` + `mypy src/` (strict) + 90% coverage floor, all as CI gates. `py.typed` added (PEP 561). 5 real lint findings and 5 real type gaps fixed, not just config-wiring.
-2. `d6d9a3c` — Fixed two silent-failure paths (`scan_file`'s `except OSError` and >5MB skip both returned `[]`, indistinguishable from a clean scan). Added `ScanStats`, threaded optionally through `scan_file`/`scan_paths`, CLI prints a stderr summary only when something was actually skipped.
-3. `c9cd3c4` — `dlp.github_pr.post_review_comments` was unbounded and re-raised any rate-limit error uncaught. Now capped at 25 comments (highest severity kept), retries a detected GitHub rate limit with backoff, never retries a real permissions error.
-4. `f6d685c` — Hypothesis property tests for Luhn/SSN/entropy. Found and fixed a real bug along the way: `.hypothesis`'s cache dir wasn't in `DEFAULT_SKIP_DIRS`, so self-scanning flagged the tool's own test cache as secrets.
-5. `14b62fd` — `pyproject.toml [tool.dlp]` per-project config support, via stdlib `tomllib` (zero new runtime dependency; documented no-op on Python 3.10). CLI flags always win; `--no-config` opts out.
+### Phase 2 — Engineering improvements (branch `engineering-audit/phase-2-engineering-improvements`, stacked on Phase 1, 6 commits)
+CI gates (ruff/mypy strict/90% coverage + `py.typed`), fixed two silent-skip
+bugs (`ScanStats`), bounded + rate-limit-hardened `github_pr.py`, Hypothesis
+property tests (+ fixed a self-inflicted `.hypothesis`-cache-dir bug),
+`pyproject.toml [tool.dlp]` config support.
 
-**Net across both phases:** 130 → 200 tests, coverage 96.45% → 97.98%, three real
-operational-trust bugs fixed (silent skip, unbounded PR-comment loop,
-self-inflicted cache-dir noise), zero regressions. Every commit individually
-verified against the full local gate sequence (ruff, mypy, pytest+coverage,
-benchmark, self-scan, 10k-iteration fuzz) before landing — see each commit
-message for its own Problem/Root cause/Engineering decision/Tradeoffs writeup.
+### Phase 3 — Architecture improvements (branch `engineering-audit/phase-3-architecture-improvements`, stacked on Phase 2, 6 commits) — **COMPLETE**
+1. `c3626f9` — `docs/adr/0001-no-plugin-system-yet.md`, grounded in real git
+   history data.
+2. `99131bd` — `benchmark/run_throughput_benchmark.py` (not CI-gated) +
+   `tests/test_performance_smoke.py` (CI-gated, catches catastrophic ReDoS-
+   style regressions). Baseline: ~1050 files/sec sequential on this machine.
+3. `c66049b` — `--jobs N` parallel scanning. **Measured before implementing**:
+   a throwaway benchmark showed threading was *slower* than sequential
+   (0.75-0.86x, GIL contention) while multiprocessing gave a real 1.4-3.6x
+   speedup — this determined the implementation, overturning the original
+   audit's tentative "threads" guess. Confirmed end-to-end through the real
+   CLI: 2.985s → 1.171s (~2.5x) on a 3000-file corpus, byte-identical output.
+   Caught a real Python 3.14 `forkserver`-start-method gotcha while writing
+   the tests (monkeypatched globals don't propagate to worker processes) —
+   fixed by testing with real file conditions instead.
+4. `5f0a47e` — `-v`/`--verbose` and `-q`/`--quiet` logging. Named `dlp`
+   logger, never the root logger, handlers only configured in `main()` (the
+   CLI entry point) — `dlp`'s modules stay safely importable as a library.
+
+**Net so far:** 130 → 215 tests, coverage 96.45% → 97.46%, five real bugs
+found and fixed along the way (three Phase-2 operational-trust bugs, one
+Phase-3 benchmark-script bug, one Phase-3 test-design bug from the
+forkserver gotcha), zero regressions. Every commit individually verified
+against the full local gate sequence (ruff, mypy, pytest+coverage,
+benchmark, self-scan, 10k-iteration fuzz) before landing — several commits
+also verified with real end-to-end CLI runs beyond the test suite (the
+`--jobs` speedup measurement, manual `-v`/`-vv`/`-q` output checks).
 
 ## Current architecture (for orientation, not re-derivation)
 
 ```
 src/dlp/
-  cli.py            argparse entry point, thin orchestration only
-  config.py         [NEW] pyproject.toml [tool.dlp] loading/validation
-  scanner.py        file walk + Finding dataclass + ScanStats [NEW]
+  cli.py            argparse entry point + logging config (LOGGER = "dlp")
+  config.py         pyproject.toml [tool.dlp] loading/validation
+  scanner.py        file walk + Finding + ScanStats + parallel scan (jobs=N)
   detectors.py       11 regex detectors + Shannon-entropy detector
   report.py          table/json/sarif rendering
   baseline.py         fingerprint-based suppression
   diff.py             git diff --name-only wrapper for --diff-only
   ignore.py            .dlpignore + inline # dlp-ignore
-  github_pr.py        inline PR comments, now rate-limit-aware [CHANGED]
+  github_pr.py        inline PR comments, rate-limit-aware, still uses print()
   shared_finding.py    maps onto the ecosystem-wide finding schema
-scripts/coverage_badge.py   [NEW] mirrors run_benchmark.py's badge pattern
+scripts/coverage_badge.py
+benchmark/
+  run_benchmark.py            accuracy (precision/recall), CI-gated
+  run_throughput_benchmark.py  speed (files/sec, MB/sec), NOT CI-gated
+docs/adr/0001-no-plugin-system-yet.md
 ```
 
-Zero runtime dependencies is a load-bearing, deliberate constraint across the
-whole codebase — respect it. `config.py`'s `tomllib` and everything test-only
-(`hypothesis`, `pytest-cov`, `ruff`, `mypy`) are dev-only, not runtime.
+Zero runtime dependencies is a load-bearing, deliberate constraint — respect
+it. `tomllib` and everything test-only (`hypothesis`, `pytest-cov`, `ruff`,
+`mypy`) are dev-only, not runtime.
 
 ## Known issues / gaps still open
 
-- **Pre-existing, low-priority, not tied to a real bug:** `scanner.py:89,120`
-  (the `ignore_root`-fallback path and the truly-empty-file early return),
-  `github_pr.py:231-232` (`main()`'s "no findings" early return). None are
-  security- or correctness-relevant; skip unless doing a dedicated coverage pass.
-- CI itself has not been run (nothing pushed) — everything above is verified
-  *locally* against the exact commands CI runs, not by CI itself. First push
-  should be watched closely for anything environment-specific that differs
-  from this sandbox.
-- This repo's own `pyproject.toml` deliberately has no `[tool.dlp]` section —
-  see commit `14b62fd`'s message for why (would silently change dozens of
-  existing tests' effective defaults, since they run with cwd at repo root).
+- **Pre-existing, low-priority, not tied to a real bug:** `scanner.py:90,121`
+  (`ignore_root`-fallback path, empty-file early return), `scanner.py:192-201`
+  (`_scan_file_worker`'s body — only executes in a worker process, coverage.py
+  can't instrument it; functionally proven by the parallel-vs-sequential
+  equality tests instead), `github_pr.py:231-232`, `cli.py:306`
+  (`--emit-findings`'s write call). None security- or correctness-relevant.
+- `github_pr.py` still uses `print()` for its own operational messages
+  (not converted to the new `LOGGER` — deliberately out of scope for the
+  logging commit, noted as a reasonable follow-up, not urgent).
+- CI itself has not been run (nothing pushed) — everything verified
+  *locally*. Watch the first real push closely, especially the `--jobs`
+  ProcessPoolExecutor path — CI runners may have fewer/different CPU
+  characteristics or a different default multiprocessing start method than
+  this sandbox's Python 3.14 (`forkserver`).
+- This repo's own `pyproject.toml` deliberately has no `[tool.dlp]` section
+  (see commit `14b62fd`'s message for why).
 
-## Recommended next task: Phase 3, item 1 — ADR for the plugin-system decision
+## Recommended next task: Phase 4 — production-readiness docs
 
-**Why this one first:** documentation-only, zero code risk, and it's the one
-Phase 3 item explicitly flagged as depending on nothing else. The audit's
-Maintainability section names `detectors.REGEX_DETECTORS` as a hardcoded
-list — the one real extensibility seam in an otherwise very low-coupling
-codebase — and recommends writing down *why* a plugin/entry-point system was
-deliberately deferred rather than letting it look like an oversight to a
-reviewer. Write `docs/adr/0001-no-plugin-system-yet.md` (Context/Problem/
-Alternatives/Decision/Consequences/Tradeoffs format, per the original audit
-request) covering: current cost of adding a detector (edit `detectors.py`,
-cut a release) vs. the cost of a plugin ABI (versioning, discovery, trust
-boundary for third-party code running against real repos) vs. staying as-is
-given the rule set's actual size (11 rules, ~200 lines, added-to maybe once
-a quarter per the git history).
+Phase 3 is done. Phase 4 is pure documentation (no code risk), covering:
+`docs/Architecture.md`, `docs/Threat-Model.md`, `docs/Operations.md`,
+`docs/Troubleshooting.md`, `docs/Performance.md`, `docs/Limitations.md`.
 
-**Estimated effort:** 1 hour. **Risk:** none (pure documentation).
+**Suggested order and why:**
 
-## Suggested implementation order after that
+1. **`docs/Limitations.md` first** — the highest-leverage one to write, and
+   the most already-known: this session's work has already surfaced several
+   honest limitations worth collecting in one place rather than scattered
+   across commit messages and ADR 0001: no way to add an org-private secret
+   format without forking (ADR 0001), `--jobs` startup cost not worth it for
+   small scans, the entropy detector's known false-positive class (binary/
+   compressed data), detectors can't catch a secret split across multiple
+   files or encoded beyond simple entropy detection. Fast to write since the
+   content already exists, just not consolidated.
+2. **`docs/Threat-Model.md`** — trust boundaries are already mostly *lived*
+   in this codebase (redaction, GITHUB_TOKEN scoping, SHA-pinned Actions)
+   but never written down as a single document. Should state explicitly:
+   what's trusted input (the source tree being scanned), what's an
+   untrusted output sink (PR comment bodies — already backtick-escaped
+   against Markdown injection, worth citing as evidence of real threat
+   modeling, not just claiming it), and what's out of scope (network
+   attacks, supply-chain compromise of a dependency — though there are
+   none at runtime).
+3. **`docs/Architecture.md`** — largely already written, in the README's
+   embedded Mermaid diagram and its surrounding prose. This is mostly
+   *extraction and expansion*, not new content: pull it out, add a
+   component diagram (the 10 `src/dlp/` modules and their actual import
+   relationships — genuinely simple, verify with a quick import-graph check
+   rather than assuming) and a sequence diagram for one real flow (a
+   `pull_request` CI run: checkout → diff-only scan → baseline filter →
+   SARIF upload + inline comments).
+4. **`docs/Operations.md`** — how to actually run this in production: the
+   pre-commit hook, the GitHub Action, the `pr-scan.yml`/`ci.yml` workflows,
+   what `--jobs` is worth turning on for, upgrade path (bump the pinned
+   `rev:`/tag).
+5. **`docs/Performance.md`** — mostly already exists in README's new
+   "Parallel scanning" section + the throughput benchmark's own docstring;
+   promote/expand into its own doc with the actual measured numbers from
+   this session (baseline ~1050 files/sec sequential, ~2.5x at `--jobs 0`
+   on a 24-core machine) framed honestly as *this machine's* numbers, not a
+   portable claim.
 
-Phase 3 (architecture, needs the ADR above to inform them):
-1. ADR above (~1hr, no risk) — do first
-2. `--jobs` parallel scanning via `ThreadPoolExecutor`/`ProcessPoolExecutor` (~3-4hrs, medium risk — touches the hot path, needs a throughput benchmark to justify which pool type)
-3. Throughput benchmark (files/sec, MB/sec) added to `benchmark/` (~2hrs) — do *before* or alongside #2, not after, so the parallelism change has something to measure against
-4. Structured `logging` adoption + `--verbose`/`--quiet` (~2hrs) — natural follow-on to the ScanStats/stderr work already done in Phase 2
+**Estimated effort:** 4-6 hours total across all six files. **Risk: none**
+(pure documentation, no code changes).
 
-Phase 4 (docs: Architecture.md, Threat-Model.md, Operations.md, Troubleshooting.md,
-Performance.md, Limitations.md) and Phase 5 (Design-Decisions.md, FAQ.md, Roadmap.md,
-Development-Log.md, Case-Study.md, retroactive ADRs for zero-deps/regex-vs-ML/
-fingerprint-design) are still fully open — see the original audit's roadmap
-table (in this conversation's history, not yet its own committed file) for
-full effort/ROI estimates per item.
+## Phase 5 (after Phase 4)
+
+`docs/Design-Decisions.md`, `docs/FAQ.md`, `docs/Roadmap.md`,
+`docs/Development-Log.md`, `docs/Case-Study.md`, retroactive ADRs (0002:
+zero-runtime-dependencies; 0003: regex+entropy over an ML/statistical
+classifier; 0004: the fingerprint design — see `Finding.fingerprint`'s
+existing docstring, which already contains the reasoning, just not in ADR
+form yet). See the original audit's roadmap for full effort/ROI estimates.
 
 ## Open questions for the human
 
-- Push Phase 1+2 now for real CI validation, or keep accumulating locally
-  through Phase 3? Recommend pushing once Phase 3's parallel-scanning change
-  lands, since that's the first change in this pass with any real behavioral
-  risk (everything so far has been additive/config/test).
-- Is `[tool.dlp]` config support (Phase 2, item 6) something you actually
-  want dog-fooded in this repo's own `pyproject.toml`, or is "built and
-  tested, not self-adopted" the right call long-term too?
+- Push Phases 1-3 now for real CI validation, or keep accumulating locally
+  through Phase 4 (docs-only, so lower urgency than after Phase 3's
+  `--jobs` change)?
+- Is `[tool.dlp]` config support something you actually want dog-fooded in
+  this repo's own `pyproject.toml`, or "built and tested, not
+  self-adopted" long-term?
 
 ## Potential risks if continuing unattended
 
-- `--jobs` parallel scanning is the first Phase 3+ item that touches
-  `scan_paths`' actual hot path rather than adding around it — worth extra
-  scrutiny on ordering guarantees (findings currently come back in a stable,
-  deterministic order; a naive thread pool `.map()` could reorder them,
-  which would silently break any test or downstream consumer relying on
-  order, e.g. the benchmark's `(file, rule)` pairing).
-- None of the remaining Phase 3/4/5 items are destructive or touch CI
-  trust boundaries the way Phase 2's `github_pr.py` work did — lower
-  supervision needed than Phase 2 required.
+- None of Phase 4 touches code — lowest-supervision phase so far. The one
+  thing worth double-checking per doc: don't let `Architecture.md`/
+  `Performance.md` drift into re-describing what the README already covers
+  well; extract and cross-link rather than duplicate, per the original
+  audit's Documentation finding (the README is already doing five jobs;
+  Phase 4 exists to relieve it, not add a sixth thing that also needs
+  updating every time something changes).

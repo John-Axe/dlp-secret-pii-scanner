@@ -12,6 +12,35 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `-v`/`--verbose` logs the resolved scan configuration and a completion
+  summary (finding count, elapsed time) to stderr; `-q`/`--quiet` suppresses
+  the skipped-files stderr notice too. Neither affects stdout findings
+  output or the exit code — logging only. Uses a named `dlp` logger, not the
+  root logger, and never configures handlers outside the CLI entry point
+  (`main()`) — the `dlp` package's modules stay safely importable as a
+  library without side-effecting a consumer's own logging setup.
+- `docs/adr/` — Architecture Decision Records, starting with
+  [0001](docs/adr/0001-no-plugin-system-yet.md): why detectors stay a
+  hardcoded list rather than growing a plugin/entry-point system, grounded
+  in this project's actual detector-addition history (zero new rules since
+  the initial commit) rather than a guess.
+- `benchmark/run_throughput_benchmark.py` measures files/sec and MB/sec
+  against a synthetic, on-the-fly-generated corpus (not CI-gated — wall-clock
+  throughput is machine-dependent in a way the accuracy benchmark isn't).
+  `tests/test_performance_smoke.py` carries the actual CI-gated regression
+  guard: generous bounds meant to catch a future catastrophic regression
+  (e.g. a detector regex that starts backtracking exponentially), not to
+  enforce a specific throughput number — closes a gap the original
+  engineering audit named explicitly.
+- `--jobs N` scans files across N worker processes (`--jobs 0` = all
+  available CPUs; default `--jobs 1`, unchanged sequential behavior). Uses
+  multiprocessing, not threading — measured empirically first: threading was
+  consistently *slower* than sequential for this CPU-bound regex workload
+  (GIL contention), multiprocessing measured a real 1.4-3.6x speedup.
+  Confirmed end-to-end through the real CLI (~2.5x on a 3000-file corpus,
+  byte-identical output to sequential). `scan_paths(..., jobs=N)` produces
+  identical findings, in identical order, with identical `ScanStats`
+  totals to `jobs=1` for the same input.
 - `findings.jsonl` output via `--emit-findings`, mapping this tool's findings onto
   the ecosystem-wide shared finding schema (severity, MITRE ATT&CK, OWASP fields)
   for consumption by `observability-stack`'s Promtail/Loki/Grafana pipeline.
