@@ -12,6 +12,14 @@ added in the same PR as the change it describes.
 ## [Unreleased]
 
 ### Added
+- `docs/Threat-Model.md` — what this tool trusts (scanned-file bytes, never
+  executed; the local git binary for `--diff-only`; `GITHUB_TOKEN` for
+  exactly one purpose) versus what it doesn't (file content as adversarial
+  input, guarded by fuzzing + a performance regression test; the GitHub
+  API's response body). Verified against source while writing, not assumed
+  — confirmed via `grep` that no `shell=True`/`eval`/`exec`/`pickle` exists
+  anywhere in `src/dlp/`, and corrected an early draft that mis-attributed
+  a redaction safeguard to the wrong module before committing.
 - `docs/Limitations.md` — detection-coverage, file-size, performance, and
   ecosystem-integration limitations consolidated in one place, plus what the
   tool deliberately doesn't do (remediate, scan git history, verify a found
