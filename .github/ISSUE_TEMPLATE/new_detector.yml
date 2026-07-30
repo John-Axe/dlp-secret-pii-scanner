@@ -1,0 +1,43 @@
+name: New detector request
+description: Propose a new secret/PII pattern to detect.
+labels: ["enhancement", "detectors"]
+body:
+  - type: input
+    id: what
+    attributes:
+      label: What should be detected
+      placeholder: e.g. Stripe API keys, Twilio auth tokens, phone numbers
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Format / examples (synthetic, not real)
+      description: >
+        The stable, identifiable shape of the token (prefix, length, charset)
+        — enough to write a regex against. Construct fake examples the same
+        way `benchmark/corpus/positives/` does; don't paste a real credential.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: false-positive-risk
+    attributes:
+      label: What could this false-positive on?
+      description: >
+        Read [`CONTRIBUTING.md`](../../CONTRIBUTING.md#adding-a-new-detector)
+        first — a new rule needs both a positive and, if it's prone to false
+        positives, a negative benchmark fixture in the same PR.
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Suggested severity
+      options:
+        - low
+        - medium
+        - high
+        - critical
+    validations:
+      required: true

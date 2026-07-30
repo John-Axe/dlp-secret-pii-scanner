@@ -1,0 +1,45 @@
+name: False positive
+description: A detector flagged something that isn't actually a secret or PII.
+labels: ["false-positive", "detectors"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: can you suppress this yourself with a trailing
+        `# dlp-ignore` comment or a `.dlpignore` pattern? That's still worth
+        reporting if the pattern is common enough that other users will hit
+        it too — but it unblocks you immediately either way.
+  - type: input
+    id: rule-id
+    attributes:
+      label: Rule ID
+      description: The `rule_id` from the scan output (e.g. `high_entropy_string`, `generic_password`).
+      placeholder: high_entropy_string
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal snippet that triggers the false positive
+      description: >
+        A short, synthetic snippet that reproduces it — please don't paste a
+        real secret even a fake-looking one from your own codebase; construct
+        a minimal example instead, the same way `benchmark/corpus/negatives/`
+        does.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this isn't actually a secret/PII
+      description: Help us decide whether this belongs as a permanent negative-corpus fixture.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: dlp-secret-pii-scanner version
+      description: Output of `dlp-scan --version` (or the pinned `rev:`/tag if using the pre-commit hook or GitHub Action).
+    validations:
+      required: true

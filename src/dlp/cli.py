@@ -6,15 +6,36 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import baseline, diff, report, severity
+from . import __version__, baseline, diff, report, severity
 from .scanner import DEFAULT_ENTROPY_THRESHOLD, scan_paths
 from .shared_finding import write_shared_findings_jsonl
+
+EPILOG = """\
+examples:
+  dlp-scan .                                        # scan cwd, table output, fail on high+
+  dlp-scan src/ --fail-on critical                   # only fail on critical findings
+  dlp-scan . --format sarif --fail-on none > r.sarif # SARIF for the Security tab
+  dlp-scan . --write-baseline .dlp-baseline.json     # snapshot current findings
+  dlp-scan --diff-only --base-ref origin/main \\
+    --baseline .dlp-baseline.json --fail-on high     # only new findings can fail a PR
+
+exit codes:
+  0  no finding met --fail-on (or --fail-on none)
+  1  at least one non-baselined finding met or exceeded --fail-on
+"""
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dlp-scan",
         description="Scan a source tree for secrets and PII.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "paths",

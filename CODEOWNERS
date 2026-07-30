@@ -1,0 +1,9 @@
+# Default owner for everything not matched more specifically below.
+*                           @John-Axe
+
+# Anything touching CI trust boundaries, token permissions, or the release/signing
+# pipeline gets explicit review attention rather than falling under the blanket rule
+# implicitly — codified here so it's visible in the file, not just in practice.
+/.github/workflows/         @John-Axe
+/action.yml                 @John-Axe
+/.pre-commit-hooks.yaml     @John-Axe
