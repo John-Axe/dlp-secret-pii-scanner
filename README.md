@@ -261,6 +261,7 @@ pip install -e ".[dev]"
 pytest
 python benchmark/run_benchmark.py
 python benchmark/run_benchmark.py --badge-output .github/badges/benchmark.json
+python benchmark/run_throughput_benchmark.py   # files/sec, MB/sec — not CI-gated, see its docstring
 dlp-scan . --fail-on critical   # self-scan
 ```
 

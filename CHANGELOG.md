@@ -17,6 +17,14 @@ added in the same PR as the change it describes.
   hardcoded list rather than growing a plugin/entry-point system, grounded
   in this project's actual detector-addition history (zero new rules since
   the initial commit) rather than a guess.
+- `benchmark/run_throughput_benchmark.py` measures files/sec and MB/sec
+  against a synthetic, on-the-fly-generated corpus (not CI-gated — wall-clock
+  throughput is machine-dependent in a way the accuracy benchmark isn't).
+  `tests/test_performance_smoke.py` carries the actual CI-gated regression
+  guard: generous bounds meant to catch a future catastrophic regression
+  (e.g. a detector regex that starts backtracking exponentially), not to
+  enforce a specific throughput number — closes a gap the original
+  engineering audit named explicitly.
 - `findings.jsonl` output via `--emit-findings`, mapping this tool's findings onto
   the ecosystem-wide shared finding schema (severity, MITRE ATT&CK, OWASP fields)
   for consumption by `observability-stack`'s Promtail/Loki/Grafana pipeline.
