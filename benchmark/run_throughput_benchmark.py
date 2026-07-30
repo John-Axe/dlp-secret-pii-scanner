@@ -34,7 +34,7 @@ _WORDS = (
     "incoming request against the schema before writing results to disk"
 ).split()
 
-_FAKE_SECRET_LINE = "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
+_FAKE_SECRET_LINE = "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"  # dlp-ignore
 
 
 def _secret_interval(lines_per_file: int) -> int:
