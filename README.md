@@ -134,6 +134,15 @@ permissions:
   security-events: write
 ```
 
+Capped at 25 comments per run by default (`--max-comments`), highest severity
+first — a PR with hundreds of findings (e.g. a leaked-credentials dump, exactly
+what this tool exists to catch) posts its most severe findings inline and prints
+how many more weren't shown, instead of firing hundreds of sequential requests
+and risking GitHub's secondary rate limit. A detected rate limit (429, or a 403
+carrying `Retry-After`/an exhausted `X-RateLimit-Remaining`) is retried with
+GitHub-directed backoff up to 3 times before giving up; a bare 403 (a real
+permissions error, e.g. a token missing `pull-requests: write`) is never retried.
+
 ### 3. Diff-only scanning + baseline mode
 
 `--diff-only` scans only files changed against `--base-ref` (default `origin/main`),

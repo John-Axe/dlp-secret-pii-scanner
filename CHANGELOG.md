@@ -37,12 +37,23 @@ added in the same PR as the change it describes.
 - `dlp-scan` now reports skipped files on stderr (count and reason: too large /
   binary / unreadable) whenever at least one file was skipped, instead of
   silently producing the same empty result a clean scan would.
+- `dlp.github_pr` now caps inline PR comments at 25 by default (`--max-comments`,
+  highest-severity findings kept when over the cap) and retries a detected
+  GitHub rate limit (429, or a 403 carrying `Retry-After`/exhausted
+  `X-RateLimit-Remaining`) with GitHub-directed backoff, up to 3 attempts.
 
 ### Fixed
 - Two silent-failure paths in `scan_file` — a file over 5MB and a file that
   raised `OSError` on read (permission denied, or removed mid-scan) — both
   previously returned `[]` indistinguishably from "scanned, no findings."
   Both are now counted and surfaced (see Added, above).
+- `dlp.github_pr.post_review_comments` previously had no bound on how many
+  sequential requests it would fire for a single PR, and any non-422 HTTP
+  error (including a transient rate limit) propagated as an unhandled
+  traceback with no partial-progress information. Now bounded and
+  rate-limit-aware (see Added, above); a genuine permissions error (a bare
+  403) still raises immediately rather than being retried into a slower,
+  more confusing failure.
 
 ### Changed
 - Code-smell cleanup across `src/` and `tests/` (refactor, no behavior change).

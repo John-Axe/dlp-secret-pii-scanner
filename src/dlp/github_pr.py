@@ -11,15 +11,32 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from . import severity
 from .scanner import Finding
 
 API_VERSION = "2022-11-28"
 USER_AGENT = "dlp-secret-pii-scanner"
+
+# A PR with hundreds of findings (e.g. someone commits a leaked-credentials
+# dump - exactly the scenario this tool exists to catch) would otherwise fire
+# that many sequential POSTs with no batching, which is both slow and a good
+# way to trip GitHub's secondary rate limit. Capped by default; override with
+# --max-comments. The highest-severity findings are kept when capping (see
+# post_review_comments), not just the first N in file-scan order.
+DEFAULT_MAX_COMMENTS = 25
+
+# Bounded, not infinite: a real outage or a misconfigured token shouldn't
+# retry forever and hang a CI job. 3 attempts with GitHub-directed backoff
+# covers a transient secondary-rate-limit trip without masking a real,
+# persistent problem behind an ever-growing wait.
+MAX_RATE_LIMIT_RETRIES = 3
 
 
 def build_comment_payload(finding: Finding, commit_sha: str) -> dict[str, Any]:
@@ -39,6 +56,75 @@ def build_comment_payload(finding: Finding, commit_sha: str) -> dict[str, Any]:
     }
 
 
+def _is_rate_limited(exc: urllib.error.HTTPError) -> bool:
+    """True for GitHub's secondary rate limit (429, or 403 carrying a
+    Retry-After / exhausted X-RateLimit-Remaining header). A bare 403 with
+    neither header is a real permissions error (e.g. a token missing
+    pull-requests: write) and must NOT be retried - retrying it just turns
+    an immediate, clear failure into a slow, confusing one.
+    """
+    if exc.code == 429:
+        return True
+    if exc.code == 403:
+        return bool(exc.headers.get("Retry-After")) or exc.headers.get(
+            "X-RateLimit-Remaining"
+        ) == "0"
+    return False
+
+
+def _retry_after_seconds(exc: urllib.error.HTTPError, attempt: int) -> float:
+    """GitHub tells you exactly how long to wait, when it can - prefer that
+    over guessing. Falls back to capped exponential backoff only if neither
+    header is present.
+    """
+    retry_after = exc.headers.get("Retry-After")
+    if retry_after is not None:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass
+    reset_at = exc.headers.get("X-RateLimit-Reset")
+    if reset_at is not None:
+        try:
+            return max(0.0, float(reset_at) - time.time())
+        except ValueError:
+            pass
+    return float(min(2**attempt, 60))
+
+
+def _post_one_comment(
+    url: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    *,
+    max_retries: int,
+    sleep: Callable[[float], None],
+) -> int | None:
+    """POSTs a single comment, retrying on a detected rate limit. Returns
+    the created comment id, or None for a 422 (the finding's line isn't
+    part of the diff, so GitHub can't anchor a comment there - expected for
+    findings outside the changed hunks, not an error).
+    """
+    attempt = 0
+    while True:
+        request = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"), method="POST", headers=headers
+        )
+        try:
+            with urllib.request.urlopen(request) as response:
+                body = json.loads(response.read())
+                comment_id = body.get("id")
+                return int(comment_id) if comment_id is not None else None
+        except urllib.error.HTTPError as exc:
+            if exc.code == 422:
+                return None
+            if _is_rate_limited(exc) and attempt < max_retries:
+                sleep(_retry_after_seconds(exc, attempt))
+                attempt += 1
+                continue
+            raise
+
+
 def post_review_comments(
     findings: list[Finding],
     *,
@@ -46,11 +132,16 @@ def post_review_comments(
     pull_number: int,
     commit_sha: str,
     token: str,
+    max_comments: int = DEFAULT_MAX_COMMENTS,
+    max_retries: int = MAX_RATE_LIMIT_RETRIES,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[int]:
-    """POSTs one inline review comment per finding. Returns the created
-    comment IDs. A 422 (line isn't part of the diff, so GitHub can't anchor
-    a comment there) is skipped rather than raised, since that's expected
-    for findings outside the changed hunks.
+    """POSTs one inline review comment per finding, up to `max_comments`.
+
+    If there are more findings than `max_comments`, the highest-severity
+    ones are kept (see severity.rank) rather than just the first N in
+    file-scan order, and a note is printed to stderr naming how many were
+    left out - so capping is visible, not another silent drop.
     """
     posted: list[int] = []
     url = f"https://api.github.com/repos/{repo}/pulls/{pull_number}/comments"
@@ -62,19 +153,26 @@ def post_review_comments(
         "User-Agent": USER_AGENT,
     }
 
-    for finding in findings:
+    prioritized = sorted(findings, key=lambda f: severity.rank(f.severity), reverse=True)
+    to_post = prioritized[:max_comments]
+    omitted = len(prioritized) - len(to_post)
+
+    for finding in to_post:
         payload = build_comment_payload(finding, commit_sha)
-        request = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"), method="POST", headers=headers
+        comment_id = _post_one_comment(
+            url, payload, headers, max_retries=max_retries, sleep=sleep
         )
-        try:
-            with urllib.request.urlopen(request) as response:
-                body = json.loads(response.read())
-                posted.append(body.get("id"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 422:
-                continue
-            raise
+        if comment_id is not None:
+            posted.append(comment_id)
+
+    if omitted > 0:
+        print(
+            f"dlp-scan: {omitted} additional finding(s) not posted as inline comments "
+            f"(--max-comments={max_comments}); see the full results in this job's SARIF "
+            "upload or table/JSON output instead.",
+            file=sys.stderr,
+        )
+
     return posted
 
 
@@ -82,6 +180,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Post DLP findings as inline PR review comments.")
     parser.add_argument(
         "findings_json", type=Path, help="Path to dlp-scan --format json output."
+    )
+    parser.add_argument(
+        "--max-comments",
+        type=int,
+        default=DEFAULT_MAX_COMMENTS,  # dlp-ignore: identifier, not a secret
+        help=f"Cap on inline comments posted, highest severity first "
+        f"(default: {DEFAULT_MAX_COMMENTS}).",
     )
     args = parser.parse_args(argv)
 
@@ -127,7 +232,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     posted = post_review_comments(
-        findings, repo=repo, pull_number=pull_number, commit_sha=commit_sha, token=token
+        findings,
+        repo=repo,
+        pull_number=pull_number,
+        commit_sha=commit_sha,
+        token=token,
+        max_comments=args.max_comments,
     )
     print(f"Posted {len(posted)} inline review comment(s).")
     return 0
